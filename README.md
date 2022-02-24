@@ -1,1 +1,1 @@
-# Gemmini-speedup-PairNet-
+# Gemmini speedup PairNet
