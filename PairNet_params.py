@@ -3,8 +3,6 @@ from tensorflow.keras.models import load_model
 import numpy as np
 from library import *
 import shutil
-from Oap.train.Oap_GD_loss import OaP_GD_loss
-import tensorflow_addons as tfa
 from gesture_signals import make_Qsiginals
 from Qconv1d import reshape_kernel, reshape_feature, pre_compute_bias, Qconv1d
 
@@ -160,8 +158,6 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
         print(np.array(layer.get_weights(), dtype=object).shape)
         # print(layer.get_weights())
         if layer.get_weights():
-            # print(fp_feature.shape)
-            # print(fp_feature)
             if 'conv1d' in layer.name:
                 conv = np.array(layer.get_weights())
             elif 'batch_normalization' in layer.name:
@@ -187,31 +183,22 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
                 best_minn, best_maxx = optimal_MinMax(convBN)
                 s2_convBN, z2_convBN = cal_scaleZeroPoint(r_max=best_maxx, r_min=best_minn)
                 QConv_BN = Quantization(convBN, s2_convBN, z2_convBN)
-                # f.write(f"const double s2_convBN{layer.name[-2:]} = {s2_convBN};\n")
-                # f.write(f"const elem_t z2_convBN{layer.name[-2:]} = {z2_convBN};\n")
                 """Bias Corrected & Quantized Bias"""
                 convBN_biasCorr = bias_Correction(convBN_bias)
                 best_minn_bias, best_maxx_bias = optimal_MinMax(convBN_biasCorr)
                 s2_convBN_bias, z2_convBN_bias = cal_scaleZeroPoint(r_max=best_maxx_bias, r_min=best_minn_bias)
                 QConv_BN_bias = Quantization(convBN_biasCorr, s2_convBN_bias, z2_convBN_bias)
-                # f.write(f"const double s2_convBN_bias{layer.name[-2:]} = {s2_convBN_bias};\n")
-                # f.write(f"const elem_t z2_convBN_bias{layer.name[-2:]} = {z2_convBN_bias};\n")
                 """calculate each block result, Conv1d -> BN -> Relu """
                 fp_result = tf.nn.conv1d(fp_feature, convBN[0], stride=stride_size, padding='VALID') + convBN_biasCorr
                 best_minn_res, best_maxx_res = optimal_MinMax(fp_result)
                 s3_convBN, z3_convBN = cal_scaleZeroPoint(r_max=best_maxx_res, r_min=best_minn_res)
-                # f.write(f"const double s3_convBN{layer.name[-2:]} = {s3_convBN};\n")
-                # f.write(f"const elem_t z3_convBN{layer.name[-2:]} = {z3_convBN};\n")
                 fp_result = tf.clip_by_value(fp_result, clip_value_min=0, clip_value_max=np.max(fp_result))
                 fp_feature = fp_result
                 s4_convBN, z4_convBN = cal_scaleZeroPoint(r_max=np.max(fp_result), r_min=0,
                                                           q_max=127, q_min=z3_convBN)
-                # f.write(f"const double s4_convBN{layer.name[-2:]} = {s4_convBN};\n")
-                # f.write(f"const elem_t z4_convBN{layer.name[-2:]} = {z4_convBN};\n")
                 f.write(f"const double downScalar{layer.name[-2:]} = {s1 * s2_convBN / s4_convBN};\n")
                 f.write(f"const elem_t z3{layer.name[-2:]} = {z4_convBN};\n")
                 f.write(f"const elem_t z4{layer.name[-2:]} = {z4_convBN};\n")
-                #
                 """Quantization"""
                 # reshape input_feature
                 Q_reshaped_feature = reshape_feature(Q_feature, kernel_size, stride_size, output_width)
@@ -227,7 +214,6 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
                 Q_result = Qconv1d(Q_reshaped_feature, Q_reshaped_kernel, QConv_BN_bias, output_width, kernel_size * in_channels,
                                    out_channels, s1 * s2_convBN / s4_convBN, z3_convBN, z4_convBN)
                 Q_feature = Q_result
-                #
                 """write QConv_BN"""
                 f.write(
                     f"const elem_t QConv_BN{layer.name[-2:]}[{wrapper}][{filters}][{in_channels}][{out_channels}]=\n")
@@ -253,22 +239,6 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
                             f.write('}')
                     f.write('}')
                 f.write('};\n')
-                # """write QConv_BN_bias"""
-                # f.write(f"const acc_t QConv_BN_bias{layer.name[-2:]}[{output_width}][{out_channels}] = \n")
-                # f.write("{")
-                # for i in range(output_width):
-                #     f.write("{")
-                #     for j in range(out_channels):
-                #         if j != (out_channels - 1):
-                #             f.write(f"{QConv_BN_bias[0][0][i][j]},")
-                #         else:
-                #             f.write(f"{QConv_BN_bias[0][0][i][j]}")
-                #     if i != (output_width - 1):
-                #         f.write("},")
-                #     else:
-                #         f.write("}")
-                # f.write("};\n")
-                # write pre-computed QConv_BN_bias
                 f.write(
                     f"const acc_t QConv_BN_bias{layer.name[-2:]}[{batch_size}][1][{output_width}][{out_channels}] = \n")
                 f.write("\n{")
@@ -309,23 +279,17 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
                 best_minn, best_maxx = optimal_MinMax(dense)
                 s2_dense, z2_dense = cal_scaleZeroPoint(r_max=best_maxx, r_min=best_minn)
                 QDense = Quantization(dense, s2_dense, z2_dense)
-                # f.write(f"const double s2_dense = {s2_dense};\n")
-                # f.write(f"const elem_t z2_dense = {z2_dense};\n")
                 """Bias Corrected & Quantized Bias"""
                 dense_biasCorr = bias_Correction(dense_bias)
                 best_minn_bias, best_maxx_bias = optimal_MinMax(dense_biasCorr)
                 s2_dense_bias, z2_dense_bias = cal_scaleZeroPoint(r_max=best_maxx_bias, r_min=best_minn_bias)
                 QDense_bias = Quantization(dense_biasCorr, s2_dense_bias, z2_dense_bias)
-                # f.write(f"const double s2_dense_bias = {s2_dense_bias};\n")
-                # f.write(f"const elem_t z2_dense_bias = {z2_dense_bias};\n")
                 """calculate dense result"""
                 fp_result = np.matmul(fp_feature, dense)
                 fp_result = fp_result + dense_bias
                 fp_feature = fp_result
                 best_minn_res, best_maxx_res = optimal_MinMax(fp_result)
                 s3_dense, z3_dense = cal_scaleZeroPoint(r_max=best_maxx_res, r_min=best_minn_res)
-                # f.write(f"const double s3_dense = {s3_dense};\n")
-                # f.write(f"const elem_t z3_dense = {z3_dense};\n")
                 f.write(f"const double downScalar_dense = {s1 * s2_dense / s3_dense};\n")
                 f.write(f"const elem_t z2_dense = {z2_dense};\n")
                 f.write(f"const double s3_dense = {s3_dense};\n")
@@ -385,7 +349,7 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
 
 
 def make_pairNet_mc2conv1d_params(batch_size, input_width, stride_size, gesN, input_signals, path, true_label: list,
-                                  len_label=1, header_name='./include/Qpairnet_mc2conv1d_params.h'):
+                                  len_label, header_name='./include/Qpairnet_mc2conv1d_params.h'):
     """feed into 1d_with_ch.c"""
     f = open(header_name, "w+")
     f.write(f"//{datetime.datetime.now()}\n")
@@ -595,7 +559,7 @@ def make_pairNet_mc2conv1d_params(batch_size, input_width, stride_size, gesN, in
 
 
 if __name__ == '__main__':
-    """for 1d_with_ch.c"""
+    """feed into mc2_conv1d_main.c"""
     # path = 'Oap/test/1100920_test_(J&W&D&j&in0)/2-10-5-9/TD20181108-155133_(Wen)_H50_N4_K2-10-5-9.txt'
     path = 'Oap/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110149_(Wen)_H50_N3_K9-8-4.txt'
 
@@ -604,4 +568,4 @@ if __name__ == '__main__':
     windows = make_window_siginals(path)
     make_Qsiginals(windows)
     make_pairNet_mc2conv1d_params(batch_size=windows.shape[0], input_width=50, stride_size=1,
-                                  input_signals=windows, gesN=gesN, path=model_path, true_label=[2, 10, 5, 9], len_label=4)
+                                  input_signals=windows, gesN=gesN, path=model_path, true_label=[9, 8, 4], len_label=3)

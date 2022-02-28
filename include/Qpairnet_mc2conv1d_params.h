@@ -1,4 +1,4 @@
-//2022-02-23 15:14:30.811379
+//2022-02-28 11:50:37.707467
 #ifndef QPAIRNET_MC2CONV1D_PARAMS_H
 #define QPAIRNET_MC2CONV1D_PARAMS_H
 
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 #define GESN 12
-#define LEN_LABLE 4
+#define LEN_LABLE 3
 struct Conv1d_Params {
 	int batch_size;
 	int input_width;
@@ -19,7 +19,7 @@ struct Conv1d_Params {
 	int output_width;
 	double out_scale;
 	};
-#define TRUE_LABEL "2 10 5 9 "
+#define TRUE_LABEL "9 8 4 "
 const double downScalar_1 = 0.018021791029491592;
 const elem_t z3_1 = -5;
 const elem_t z4_1 = -5;
