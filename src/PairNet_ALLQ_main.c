@@ -11,6 +11,10 @@
 
 
 int main(){
+    double q = rounding(M0_5 * (1LL << 31));
+    double test = (int )q >> right_shift_5;
+    printf("%f\n", q);
+    printf("%f\n", test);
 
     clock_t start = clock();
     /*****PairNet Quantized*****/
@@ -56,12 +60,12 @@ int main(){
     //write_txt(QConv_BN_5_params.batch_size,QConv_BN_5_params.output_width, QConv_BN_5_params.out_channels,QConv_BN_5_out, "**conv5**");
     printf("QGAP\n");
     Qglobal_avg_pooling(QConv_BN_5_params.batch_size, QConv_BN_5_params.output_width,QConv_BN_5_params.out_channels, QConv_BN_5_out, QGap_out);
-//    for (int i = 0; i < QConv_BN_5_params.output_width; ++i) {
-//        for (int j = 0; j < QConv_BN_5_params.out_channels; ++j) {
-//            printf("%d\t", QGap_out[i][j]);
-//        }
-//        printf("\n");
-//    }
+    for (int i = 0; i < QConv_BN_5_params.batch_size; ++i) {
+        for (int j = 0; j < QConv_BN_5_params.out_channels; ++j) {
+            printf("%d\t", QGap_out[i][j]);
+        }
+        printf("\n");
+    }
     QDense(QConv_BN_5_params.batch_size,QConv_BN_5_params.out_channels, gesN, QGap_out, QDense_params, QDense_bias, QDense_out, downScalar_dense);
 //    printf("QMatmul\n");
 //    for (int i = 0; i < QConv_BN_5_params.batch_size; ++i) {

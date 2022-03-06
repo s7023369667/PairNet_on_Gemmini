@@ -126,9 +126,10 @@ def preprocessing(train, train_label, gesN):
 
 def train():
     Model_Name_Now_Time = time.strftime("%Y%m%d", time.localtime())
-    gesN = 12
     window_size = 50
-    Model_HDF5_name = f'./model/pairnet_model16_{gesN}_{Model_Name_Now_Time}.h5'
+    gesN = 5
+    channel = 64
+    Model_HDF5_name = f'./model/pairnet_model{channel}_{gesN}_{Model_Name_Now_Time}.h5'
 
     training_path = '../Oap/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)'
     train, train_label = get_samples(get_files(training_path, gesN))

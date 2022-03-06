@@ -7,9 +7,9 @@
 
 #ifndef GEMMINI_PROJECTS_FUNC_H
 #define GEMMINI_PROJECTS_FUNC_H
-#include "include/gemmini.h"
-#include "include/gemmini_params.h"
-#include "include/gemmini_nn.h"
+//#include "include/gemmini.h"
+//#include "include/gemmini_params.h"
+//#include "include/gemmini_nn.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -17,8 +17,8 @@
 #include <limits.h>
 #include <time.h>
 
-//typedef int8_t elem_t;
-//typedef int32_t acc_t;
+typedef int8_t elem_t;
+typedef int32_t acc_t;
 
 
 static double flooring(double x){
@@ -108,7 +108,7 @@ static int32_t round_near_even(double x){
 
 static elem_t relu_clip(int64_t x, bool use_relu){
     elem_t tmp;
-    //elem_t elem_t_max = 127;
+    elem_t elem_t_max = 127;
     if (x < 0) {
         if (use_relu){
             tmp = 0;
@@ -145,7 +145,7 @@ static void Relu(int batch_size, int input_width, int in_channels, double input_
  static elem_t QRelu_Clip(int32_t x,elem_t Z3, elem_t Z4 ,bool use_relu){
 
     elem_t tmp;
-    //elem_t elem_t_max = 127 ,elem_t_min = -128;
+    elem_t elem_t_max = 127 ,elem_t_min = -128;
     if (use_relu){
         if (x < (int32_t)Z3){
             tmp = (elem_t)Z4;
@@ -196,30 +196,30 @@ static void Matmul(size_t I, size_t K, size_t J, double matrixA[I][K],const doub
 static void QDense(int I, int K, int J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[I][J],
            elem_t matrixC[I][J], double downScalar){
     /**without pre-compute bias**/
-    enum tiled_matmul_type_t tiled_matmul_type = WS;
-    tiled_matmul_auto(I, J, K, (elem_t*)matrixA, (elem_t*)matrixB,(acc_t*)bias, (elem_t*)matrixC,
-                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,
-                      (float )downScalar,0,false,false,false,false,false,3,tiled_matmul_type);
-    for (int i = 0; i < I; ++i) {
-        for (int j = 0; j < J; ++j) {
-            matrixC[i][j] = QRelu_Clip(matrixC[i][j], 0, 0, false);
-        }
-    }
+//    enum tiled_matmul_type_t tiled_matmul_type = WS;
+//    tiled_matmul_auto(I, J, K, (elem_t*)matrixA, (elem_t*)matrixB,(acc_t*)bias, (elem_t*)matrixC,
+//                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,
+//                      (float )downScalar,0,false,false,false,false,false,3,tiled_matmul_type);
 //    for (int i = 0; i < I; ++i) {
-//        double tmp_res = 0.0;
 //        for (int j = 0; j < J; ++j) {
-//            for (int k = 0; k < K; ++k) {
-//                tmp_res += (double )(matrixA[i][k] * matrixB[k][j]) ;
-//            }
-//            matrixC[i][j] = QRelu_Clip(round_near_even((downScalar * (tmp_res + bias[i][j]))),0, 0, false);
-//            tmp_res = 0;
+//            matrixC[i][j] = QRelu_Clip(matrixC[i][j], 0, 0, false);
 //        }
 //    }
+    for (int i = 0; i < I; ++i) {
+        double tmp_res = 0.0;
+        for (int j = 0; j < J; ++j) {
+            for (int k = 0; k < K; ++k) {
+                tmp_res += (double )(matrixA[i][k] * matrixB[k][j]) ;
+            }
+            matrixC[i][j] = QRelu_Clip(round_near_even((downScalar * (tmp_res + bias[i][j]))),0, 0, false);
+            tmp_res = 0;
+        }
+    }
 }
 
 static void QMatmul(size_t I, size_t K, size_t J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[J],
              elem_t matrixC[I][J],double S1, elem_t Z1,double S2 , elem_t Z2,double S2_bias, elem_t Z2_bias,double S3, elem_t Z3){
-    //with pre-compute bias
+    /**with pre-compute bias**/
     acc_t total_bias[I][J];
     for (int i = 0; i < I; ++i) {
         double tmp_res = 0;
@@ -361,32 +361,32 @@ static void conv1d_matmul(size_t batch_size, size_t input_width, size_t in_chann
             }
             start += stride_size * in_channels;
         }
-        enum tiled_matmul_type_t tiled_matmul_type = WS;
-        elem_t gemmini_result[output_width][out_channels];
-        tiled_matmul_auto(output_width, out_channels, kernel_size * in_channels, (elem_t *) reshape_feature,
-                          (elem_t *) reshape_kernel,
-                          (acc_t *) total_bias[batch_idx][0], (elem_t *) gemmini_result, kernel_size * in_channels,
-                          out_channels, out_channels, out_channels,
-                          MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, NO_ACTIVATION,
-                          (float) downScalar, 0, false,
-                          false, false, false, false, 3, tiled_matmul_type);
-        for (int i = 0; i < output_width; ++i) {
-            for (int j = 0; j < out_channels; ++j) {
-                out_feature[batch_idx][0][i][j] = QRelu_Clip(gemmini_result[i][j], Z3, Z4, true);
-            }
-        }
-
+//        enum tiled_matmul_type_t tiled_matmul_type = WS;
+//        elem_t gemmini_result[output_width][out_channels];
+//        tiled_matmul_auto(output_width, out_channels, kernel_size * in_channels, (elem_t *) reshape_feature,
+//                          (elem_t *) reshape_kernel,
+//                          (acc_t *) total_bias[batch_idx][0], (elem_t *) gemmini_result, kernel_size * in_channels,
+//                          out_channels, out_channels, out_channels,
+//                          MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, NO_ACTIVATION,
+//                          (float) downScalar, 0, false,
+//                          false, false, false, false, 3, tiled_matmul_type);
 //        for (int i = 0; i < output_width; ++i) {
-//            double tmp_res = 0;
 //            for (int j = 0; j < out_channels; ++j) {
-//                for (int k = 0; k < kernel_size * in_channels; ++k) {
-//                    tmp_res += (double) (reshape_feature[i][k] * reshape_kernel[k][j]);
-//                }
-//                out_feature[batch_idx][0][i][j] = QRelu_Clip(
-//                        round_near_even(downScalar * (tmp_res + total_bias[batch_idx][0][i][j])), Z3, Z4, true);
-//                tmp_res = 0;
+//                out_feature[batch_idx][0][i][j] = QRelu_Clip(gemmini_result[i][j], Z3, Z4, true);
 //            }
 //        }
+
+        for (int i = 0; i < output_width; ++i) {
+            double tmp_res = 0;
+            for (int j = 0; j < out_channels; ++j) {
+                for (int k = 0; k < kernel_size * in_channels; ++k) {
+                    tmp_res += (double) (reshape_feature[i][k] * reshape_kernel[k][j]);
+                }
+                out_feature[batch_idx][0][i][j] = QRelu_Clip(
+                        round_near_even(downScalar * (tmp_res + total_bias[batch_idx][0][i][j])), Z3, Z4, true);
+                tmp_res = 0;
+            }
+        }
     }
 };
 
@@ -696,7 +696,6 @@ static void conv1d_TF_folding(size_t batch_size, size_t input_width, size_t in_c
             output_feature[batch_idx][c] = (elem_t)rounding(sum / (1 * input_width));
         }
     }
-
 }
 void plot_result(int batch_size, double y_axis[batch_size]);
 static void post_processing(int batch_size, int gesN, double result_matrix[batch_size][gesN],int K){

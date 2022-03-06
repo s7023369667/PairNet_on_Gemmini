@@ -43,7 +43,6 @@ def reshape_kernel(kernel: np.ndarray):
 
 def reshape_feature(input_feature: np.ndarray, kernel_size, stride_size, out_width):
     batch_size = input_feature.shape[0]
-    # in_width = input_feature.shape[2]
     in_channels = input_feature.shape[3]
     reshape_featre = []
     for idx in range(batch_size):

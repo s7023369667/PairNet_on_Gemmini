@@ -125,8 +125,7 @@ def make_pairNetQDEQ_params(batch_size, input_width, stride_size, gesN, header_n
 
 
 def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_signals, path, true_label: list,
-                            len_label,
-                            header_name='./include/Qpairnet_params.h'):
+                            len_label, header_name='./include/Qpairnet_params.h'):
     """feed into PairNet_ALLQ_main.c"""
     f = open(header_name, "w+")
     f.write(f"//{datetime.datetime.now()}\n")
@@ -139,9 +138,7 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
     f.write("struct Conv1d_Params {\n\tint batch_size;\n\tint input_width;\n\tint in_channels;\n\t"
             "int out_channels;\n\tint kernel_size;\n\tint stride_size;\n\t""int padding_front;\n\t"
             "int padding_back;\n\tint output_width;\n\tdouble out_scale;\n\t};\n")
-    gt = ""
-    for char in true_label:
-        gt += str(char) + " "
+    gt = ''.join([str(i)+' ' for i in true_label])
     f.write(f'#define TRUE_LABEL \"{gt}\"\n')
     model_pairNet = load_model(path)
     fp_feature = input_signals
@@ -149,11 +146,9 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
     s1, z1 = cal_scaleZeroPoint(r_max=best_maxx, r_min=best_minn)
     Q_windows = Quantization(fp_feature, s1, z1)
     Q_feature = Q_windows
-
     for layer in model_pairNet.layers:
         print(layer.name)
-        print(np.array(layer.get_weights(), dtype=object).shape)
-        # print(layer.get_weights())
+        # print(np.array(layer.get_weights(), dtype=object).shape)
         if layer.get_weights():
             if 'conv1d' in layer.name:
                 conv = np.array(layer.get_weights())
@@ -168,10 +163,7 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
                 padding_front, padding_back, padding_size = 0, 0, 0
                 if do_padding:
                     padding_back = 1
-                    if kernel_size % 2 != 0:
-                        padding_front = 1
-                    else:
-                        padding_front = 0
+                    padding_front = 1 if kernel_size % 2 != 0 else 0
                 padding_size = padding_back + padding_front
                 output_width = (input_width - kernel_size + padding_size) // stride_size + 1
                 """Folding zeroPointBN into Conv1D"""
@@ -193,6 +185,7 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
                 fp_feature = fp_result
                 s4_convBN, z4_convBN = cal_scaleZeroPoint(r_max=np.max(fp_result), r_min=0,
                                                           q_max=127, q_min=z3_convBN)
+
                 f.write(f"const double downScalar{layer.name[-2:]} = {s1 * s2_convBN / s4_convBN};\n")
                 f.write(f"const elem_t z3{layer.name[-2:]} = {z4_convBN};\n")
                 f.write(f"const elem_t z4{layer.name[-2:]} = {z4_convBN};\n")
@@ -203,10 +196,9 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
                 Q_reshaped_kernel = reshape_kernel(QConv_BN)
                 # pre-compute bias
                 QConv_BN_bias = pre_compute_bias(Q_reshaped_feature, Q_reshaped_kernel, QConv_BN_bias[0][0],
-                                                 kernel_size * in_channels,
-                                                 s1, z1, s2_convBN, z2_convBN, s2_convBN_bias, z2_convBN_bias,
-                                                 s3_convBN, z3_convBN, s4_convBN, z4_convBN)
-
+                                                 kernel_size * in_channels, s1, z1, s2_convBN, z2_convBN,
+                                                 s2_convBN_bias, z2_convBN_bias,s3_convBN, z3_convBN, s4_convBN,
+                                                 z4_convBN)
                 # compute result
                 Q_result = Qconv1d(Q_reshaped_feature, Q_reshaped_kernel, QConv_BN_bias, output_width, kernel_size * in_channels,
                                    out_channels, s1 * s2_convBN / s4_convBN, z3_convBN, z4_convBN)
@@ -282,8 +274,7 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
                 s2_dense_bias, z2_dense_bias = cal_scaleZeroPoint(r_max=best_maxx_bias, r_min=best_minn_bias)
                 QDense_bias = Quantization(dense_biasCorr, s2_dense_bias, z2_dense_bias)
                 """calculate dense result"""
-                fp_result = np.matmul(fp_feature, dense)
-                fp_result = fp_result + dense_bias
+                fp_result = np.matmul(fp_feature, dense) + dense_bias
                 fp_feature = fp_result
                 best_minn_res, best_maxx_res = optimal_MinMax(fp_result)
                 s3_dense, z3_dense = cal_scaleZeroPoint(r_max=best_maxx_res, r_min=best_minn_res)
@@ -359,9 +350,7 @@ def make_pairNet_mc2conv1d_params(batch_size, input_width, stride_size, gesN, in
     f.write("struct Conv1d_Params {\n\tint batch_size;\n\tint input_width;\n\tint in_channels;\n\t"
             "int out_channels;\n\tint kernel_size;\n\tint stride_size;\n\t""int padding_front;\n\t"
             "int padding_back;\n\tint output_width;\n\tdouble out_scale;\n\t};\n")
-    gt = ""
-    for char in true_label:
-        gt += str(char) + " "
+    gt = ''.join([str(i)+' ' for i in true_label])
     f.write(f'#define TRUE_LABEL \"{gt}\"\n')
     model_pairNet = load_model(path)
     fp_feature = input_signals
@@ -371,7 +360,7 @@ def make_pairNet_mc2conv1d_params(batch_size, input_width, stride_size, gesN, in
     Q_feature = Q_windows
     for layer in model_pairNet.layers:
         print(layer.name)
-        print(np.array(layer.get_weights(), dtype=object).shape)
+        # print(np.array(layer.get_weights(), dtype=object).shape)
         if layer.get_weights():
             if 'conv1d' in layer.name:
                 conv = np.array(layer.get_weights())
@@ -386,10 +375,7 @@ def make_pairNet_mc2conv1d_params(batch_size, input_width, stride_size, gesN, in
                 padding_front, padding_back, padding_size = 0, 0, 0
                 if do_padding:
                     padding_back = 1
-                    if kernel_size % 2 != 0:
-                        padding_front = 1
-                    else:
-                        padding_front = 0
+                    padding_front = 1 if kernel_size % 2 != 0 else 0
                 padding_size = padding_back + padding_front
                 output_width = (input_width - kernel_size + padding_size) // stride_size + 1
                 """Float"""
@@ -491,8 +477,7 @@ def make_pairNet_mc2conv1d_params(batch_size, input_width, stride_size, gesN, in
                 s2_dense_bias, z2_dense_bias = cal_scaleZeroPoint(r_max=best_maxx_bias, r_min=best_minn_bias)
                 QDense_bias = Quantization(dense_biasCorr, s2_dense_bias, z2_dense_bias)
                 # calculate dense result
-                fp_result = np.matmul(fp_feature, dense)
-                fp_result = fp_result + dense_bias
+                fp_result = np.matmul(fp_feature, dense) + dense_bias
                 fp_feature = fp_result
                 best_minn_res, best_maxx_res = optimal_MinMax(fp_result)
                 s3_dense, z3_dense = cal_scaleZeroPoint(r_max=best_maxx_res, r_min=best_minn_res)
@@ -554,14 +539,3 @@ def make_pairNet_mc2conv1d_params(batch_size, input_width, stride_size, gesN, in
     shutil.copyfile('./include/Qpairnet_mc2conv1d_params.h', dst)
 
 
-if __name__ == '__main__':
-    """feed into mc2_conv1d_main.c"""
-    # path = 'Oap/test/1100920_test_(J&W&D&j&in0)/2-10-5-9/TD20181108-155133_(Wen)_H50_N4_K2-10-5-9.txt'
-    path = 'Oap/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110149_(Wen)_H50_N3_K9-8-4.txt'
-
-    gesN = 12
-    model_path = "PairNet/model/pairnet_model16_12_20220216.h5"
-    windows = make_window_siginals(path)
-    make_Qsiginals(windows)
-    make_pairNet_mc2conv1d_params(batch_size=windows.shape[0], input_width=50, stride_size=1,
-                                  input_signals=windows, gesN=gesN, path=model_path, true_label=[9, 8, 4], len_label=3)

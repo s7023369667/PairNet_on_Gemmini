@@ -5,6 +5,7 @@ import tensorflow_addons as tfa
 import keras.backend as K
 import numpy as np
 
+
 def OaP_GD_loss(y_true, y_pred):
     qq = 0.00001
     LF = K.switch(K.equal(y_true, 1),

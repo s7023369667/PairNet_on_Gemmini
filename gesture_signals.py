@@ -79,9 +79,3 @@ def make_Qsiginals(windows, header_name='./include/Qgesture_signals.h'):
     f.close()
     dst = '/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/include/Qgesture_signals.h'
     shutil.copyfile('./include/Qgesture_signals.h', dst)
-
-
-if __name__ == '__main__':
-    path = 'Oap/test/1100920_test_(J&W&D&j&in0)/3-7-5-11/TD20181001-152951_(Johny)_H50_N4_K3-7-5-11.txt'
-    # windows = make_window_siginals(path)
-    # make_siginals_headers(windows)

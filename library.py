@@ -76,13 +76,11 @@ def make_window_siginals(txt_path):
     with open(txt_path, 'r') as f:
         window = []
         pairNet_samples = f.readlines()[:-50]
-        oapNet_samples = f.readlines()
         for line in pairNet_samples:
             window.append(list(map(eval, line.split())))
             if len(window) == window_size:
                 queue.append(np.array(window[:], dtype=np.float32).reshape((1, 50, 6)))  # window clones
                 window.pop(0)
-    # print(np.array(queue).shape)
     return np.array(queue)
 
 
@@ -161,16 +159,7 @@ def optimal_MinMax(x: np.ndarray):
 
 
 def approximate_M(M: float):
-    n = 1
-    # the maximum number that is use the n, m0
-    P = 15500
-    while True:
-        result = int(round(M * P))
-        M0 = int(round(M * (2 ** n)))
-        approx_result = M0 * P >> n
-        error = result - approx_result
-        print(f"n={n}, M0={M0}, approx={approx_result}, error={error}")
-        if math.fabs(error) < 1e-9 or n >= 22:
-            return n, M0
-        n += 1
+    """M = S1 * S2 / S4 , could be approximated to a fixed-point-number(m0) with bit shift(n) """
+    m0, n = math.frexp(M)
+    return m0, n
 

@@ -204,6 +204,47 @@ void Relu_Clip(int batch_size, int out_dim, int out_channels, elem_t C[batch_siz
 }
 
 
+void test_mc2_1dconv_global_avg(int batch, int out_dim, int out_channels, int PE_N, const elem_t * A, const elem_t * C) {
+    double scale = 1.0 / out_dim;
+    gemmini_mc2_config_ex(WS, NO_ACTIVATION, scale, 0);
+// gemmini_extended4_config_ld(PE_N*sizeof(elem_t), MVIN_SCALE_IDENTITY, true, 1, 0);
+    gemmini_extended3_config_ld(PE_N * sizeof(elem_t), MVIN_SCALE_IDENTITY, true, 0);
+// gemmini_mc2_config_ldA(out_channels*sizeof(elem_t), DIM);
+    gemmini_mc2_config_st(PE_N);
+    int out_rows = (out_channels / (PE_N*PE_N)) + (out_channels % PE_N != 0) ;
+    const uint32_t C_sp_addr_start = 0XC0000000;
+    for(int b = 0; b < batch; b++){
+//mvin
+        for(int row = 0; row < out_dim; row ++){
+            int A_row = (out_channels / PE_N) + (out_channels % PE_N != 0);
+            if(A_row <= PE_N){
+                gemmini_mc2_mvin(A + row * out_channels + b * out_dim * out_channels, C_sp_addr_start +100+ b * A_row , PE, A_row);
+// printf("A = %p, C = %p , A_row = %d\n" , A + row, C_sp_addr_start , A_row);
+            }
+            else{
+                for(int i = 0; i < out_rows; i++){
+                    int A_row2 = (out_channels - (i * PE_N*PE_N)) > PE_N * PE_N ? PE_N : ((out_channels - (i * PE_N*PE_N)) / PE_N ) + ((out_channels - (i * PE_N*PE_N))%PE_N!=0) ;
+                    gemmini_mc2_mvin(A + row * out_channels + b * out_dim * out_channels, C_sp_addr_start+100 + A_row *( b + (i * PE_N)) , PE, A_row2);
+                }
+            }
+        }
+//mvout
+        int out_row = (out_channels / PE_N) > PE_N ? PE_N : (out_channels / PE_N) + (out_channels % PE_N !=0);
+        uint32_t output = C_sp_addr_start + (out_channels > (PE_N * PE_N) ? PE_N : 0) + b * out_row+100;
+        if(out_row <= PE_N){
+            gemmini_mc2_mvout(C + ((out_channels > (PE_N * PE_N)) ? PE_N : 0) + b * out_channels, output, PE_N, out_row);
+// printf("output = %p, C = %p , C_col = %d, C_row = %d\n" , output, C + (out_channels > PE_N * PE_N ? PE_N : 0), out_col, out_row);
+        }
+        else{
+            for(int i = 0; i < out_rows; i++){
+                int out_row2 = (out_channels - (i * PE_N*PE_N)) > PE_N * PE_N ? PE_N : ((out_channels - (i * PE_N*PE_N)) / PE_N ) + ((out_channels - (i * PE_N*PE_N))%PE_N!=0) ;
+                gemmini_mc2_mvout(C + i * PE_N + b * out_channels, output + i * PE_N, PE_N, out_row2);
+            }
+        }
+    }
+    gemmini_fence();
+}
+
 int main () {
     /*****PairNet Quantized*****/
     printf("PairNet conv1d with Gemmini\n");
@@ -255,7 +296,15 @@ int main () {
 //    block_print1(QConv_BN_5_params.batch_size,QConv_BN_5_params.output_width, QConv_BN_5_params.out_channels,QConv_BN_5_out);
 
     // test_mc2_1dconv(tiled_matmul_type, NO_ACTIVATION, 1, 0, l1_input, l1_weight, l1_bias, l1_output, 8, 20, 1, 2, 10, 1, 10, 19);
-    GAP(QConv_BN_5_params.batch_size, QConv_BN_5_params.output_width,QConv_BN_5_params.out_channels, QConv_BN_5_out, QGap_out);
+    test_mc2_1dconv_global_avg(QConv_BN_5_params.batch_size, QConv_BN_5_params.output_width,QConv_BN_5_params.out_channels,PE,(elem_t*)QConv_BN_5_out, (elem_t*)QGap_out);
+    //GAP(QConv_BN_5_params.batch_size, QConv_BN_5_params.output_width,QConv_BN_5_params.out_channels, QConv_BN_5_out, QGap_out);
+    printf("QGAP\n");
+//    for (int i = 0; i < QConv_BN_5_params.batch_size; ++i) {
+//        for (int j = 0; j < QConv_BN_5_params.out_channels; ++j) {
+//            printf("%d\t", QGap_out[i][j]);
+//        }
+//        printf("\n");
+//    }
     Dense(QConv_BN_5_params.batch_size,QConv_BN_5_params.in_channels, gesN, QGap_out, QDense_params, QDense_bias, QDense_out,
           (float )downScalar_dense);
 //    for (int i = 0; i < QConv_BN_5_params.batch_size; ++i) {
