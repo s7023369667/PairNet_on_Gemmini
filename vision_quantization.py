@@ -213,7 +213,7 @@ def compute_missing(model, windows):
 
 if __name__ == '__main__':
     path = 'Oap/test/1100920_test_(J&W&D&j&in0)/3-7-5-11/TD20181001-152951_(Johny)_H50_N4_K3-7-5-11.txt'
-    model_pairNet = load_model("PairNet/model/pairnet_model_20220129.h5")
+    model_pairNet = load_model("PairNet/model/pairnet_model64_12_20220308.h5")
     # calculate_layers(model_pairNet, path, batch_size=265)
     windows = make_window_siginals(path)
     compute_missing(model_pairNet, windows)

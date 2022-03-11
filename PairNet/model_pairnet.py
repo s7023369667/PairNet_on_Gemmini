@@ -17,16 +17,11 @@ from keras.optimizers import Adadelta
  '''
 
 
-def build_model(input_shape, dim, odim):
+def build_model(input_shape, dim, odim, channel):
     cprint(colored('Now Import Model - Pairnet'), 'magenta', 'on_grey')
-    channel = 16
     input1 = Input(shape=(input_shape, dim))
-    '''
-      使用 BatchNormalization() 時會扣掉平均，在除於標準差
-      所以若在Conv1D()中每個權重計算結果後還要加上一個bias
-      bias在最後也會全部被扣掉，只是徒增BatchNormalization()訓練上的麻煩(bias也是一個訓練的參數)
-    '''
-    out = Conv1D(channel, 3, strides=1,activation=None, use_bias=False, name='conv1d_1')(input1)  # (?, 48, 128)
+
+    out = Conv1D(channel, 3, strides=1, activation=None, use_bias=False, name='conv1d_1')(input1)  # (?, 48, 128)
     out = BatchNormalization(name='batch_normalization_1')(out)
     out = Activation('relu', name='relu_1')(out)
 
@@ -38,11 +33,11 @@ def build_model(input_shape, dim, odim):
     out = BatchNormalization(name='batch_normalization_3')(out)
     out = Activation('relu', name='relu_3')(out)
 
-    out = Conv1D(channel*2, 2, strides=2, activation=None, use_bias=False, name='conv1d_4')(out)  # (?, 6, 256)
+    out = Conv1D(channel * 2, 2, strides=2, activation=None, use_bias=False, name='conv1d_4')(out)  # (?, 6, 256)
     out = BatchNormalization(name='batch_normalization_4')(out)
     out = Activation('relu', name='relu_4')(out)
 
-    out = Conv1D(channel*2, 2, strides=2, activation=None, use_bias=False, name='conv1d_5')(out)  # (?, 3, 256)
+    out = Conv1D(channel * 2, 2, strides=2, activation=None, use_bias=False, name='conv1d_5')(out)  # (?, 3, 256)
     out = BatchNormalization(name='batch_normalization_5')(out)
     out = Activation('relu', name='relu_5')(out)
 
@@ -53,32 +48,13 @@ def build_model(input_shape, dim, odim):
     model = Model(inputs=input1, outputs=out)
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
-    # config = model.get_config()
-    # with open('pairnet.txt', 'w') as logFile:
-    #     pp = pprint.PrettyPrinter(stream=logFile)
-    #     pp.pprint(config)
-
-    # yaml_string = model.to_yaml()
-    # print(yaml_string)
-    # os._exit(0)
-
     return model
-
-
-# def get_flops(model):
-#     run_meta = tf.RunMetadata()
-#     opts = tf.profiler.ProfileOptionBuilder.float_operation()
-#
-#     # We use the Keras session graph in the call to the profiler.
-#     flops = tf.profiler.profile(graph=K.get_session().graph,
-#                                 run_meta=run_meta, cmd='op', options=opts)
-#
-#     return flops.total_float_ops  # Prints the "flops" of the model.
 
 
 if __name__ == '__main__':
     gesN = 5
-    model_tmp = build_model(50, 6, gesN)
+    channel = 16
+    model_tmp = build_model(50, 6, gesN, channel)
 
     # print('total_float_ops - ', get_flops(model_tmp))
     model_tmp.summary()

@@ -11,16 +11,12 @@
 
 
 int main(){
-    double q = rounding(M0_5 * (1LL << 31));
-    double test = (int )q >> right_shift_5;
-    printf("%f\n", q);
-    printf("%f\n", test);
-
     clock_t start = clock();
     /*****PairNet Quantized*****/
     printf("PairNet\n");
     printf("Input Gesture : %s \n", TRUE_LABEL);
     int gesN = GESN;
+
     /**conv1**/
     conv1d_matmul(QConv_BN_1_params.batch_size,QConv_BN_1_params.input_width,QConv_BN_1_params.in_channels,gesture_signals,
                       QConv_BN_1_params.kernel_size, QConv_BN_1_params.out_channels, QConv_BN_1_params.stride_size, QConv_BN_1,
@@ -58,9 +54,10 @@ int main(){
                       downScalar_5, z3_5,z4_5, QConv_BN_5_out);
 //    block_print(QConv_BN_5_params.batch_size,QConv_BN_5_params.output_width, QConv_BN_5_params.out_channels,QConv_BN_5_out);
     //write_txt(QConv_BN_5_params.batch_size,QConv_BN_5_params.output_width, QConv_BN_5_params.out_channels,QConv_BN_5_out, "**conv5**");
-    printf("QGAP\n");
+//    printf("QGAP\n");
     Qglobal_avg_pooling(QConv_BN_5_params.batch_size, QConv_BN_5_params.output_width,QConv_BN_5_params.out_channels, QConv_BN_5_out, QGap_out);
     for (int i = 0; i < QConv_BN_5_params.batch_size; ++i) {
+        printf("batch %d\n", i);
         for (int j = 0; j < QConv_BN_5_params.out_channels; ++j) {
             printf("%d\t", QGap_out[i][j]);
         }
@@ -74,8 +71,8 @@ int main(){
 //        }
 //        printf("\n");
 //    }
-    QSoftMax(QConv_BN_5_params.batch_size, gesN, QDense_out,deq_softmax_out,s3_dense, z3_dense);
-    post_processing(QConv_BN_5_params.batch_size, gesN, deq_softmax_out,LEN_LABLE);
+    //QSoftMax(QConv_BN_5_params.batch_size, gesN, QDense_out,deq_softmax_out,s3_dense, z3_dense);
+    post_processing(QConv_BN_5_params.batch_size, gesN, QDense_out,LEN_LABLE);
     clock_t end = clock();
     printf("Cost(clock cycles) = %lu\n", end - start);
     printf("SUCCESS\n");

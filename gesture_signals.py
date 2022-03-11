@@ -1,6 +1,5 @@
 import tensorflow_addons as tfa
 from keras.models import load_model
-from Oap.train.Oap_GD_loss import OaP_GD_loss
 from library import *
 import datetime
 from library import *

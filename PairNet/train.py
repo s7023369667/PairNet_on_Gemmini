@@ -23,7 +23,6 @@ def get_files(path, gesN):
                 continue
             clean_files.append((path + '/' + subdir + '/' + i, subdir))
     # print('file - ', clean_files)
-    print(clean_files)
     return clean_files
 
 
@@ -127,16 +126,17 @@ def preprocessing(train, train_label, gesN):
 def train():
     Model_Name_Now_Time = time.strftime("%Y%m%d", time.localtime())
     window_size = 50
-    gesN = 5
-    channel = 64
-    Model_HDF5_name = f'./model/pairnet_model{channel}_{gesN}_{Model_Name_Now_Time}.h5'
+    gesN = 12
+    channel = 16
+    Model_HDF5_name = f'./model/pairnet_noRelu_model{channel}_{gesN}_{Model_Name_Now_Time}.h5'
 
     training_path = '../Oap/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)'
     train, train_label = get_samples(get_files(training_path, gesN))
 
     x_train, y_train, x_val, y_val = preprocessing(train, train_label,gesN)
 
-    model = build_model(window_size, 6, gesN)
+    # model = build_model(window_size, 6, gesN, channel)
+    model = build_model(window_size, 6, gesN, channel)
     model.summary()
     lr = ReduceLROnPlateau(patience=5, factor=0.4, min_delta=0.0001, min_lr=0.00001, verbose=1)
     c = ModelCheckpoint(Model_HDF5_name, monitor='val_accuracy', verbose=0, save_best_only=True, period=1)

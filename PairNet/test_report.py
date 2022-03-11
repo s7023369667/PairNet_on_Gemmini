@@ -164,9 +164,9 @@ def get_label(file_label):
 
 
 if __name__ == '__main__':
-    gesN = 7
+    gesN = 12
     # path = '1071109_test_1-2-3-4_New12(J&W&D&j)/4-5/TD20181017-204854_(judy)_H50_N2_K4-5.txt'
-    model_pairNet = load_model(f'./model/pairnet_model16_7_20220216.h5')
+    model_pairNet = load_model(f'./model/pairnet_adjRelu_model16_12_20220309.h5')
     path_dir = '1071109_test_1-2-3-4_New12_test/'
     batch_size = 1
     input_shape = model_pairNet.inputs[0].shape.as_list()

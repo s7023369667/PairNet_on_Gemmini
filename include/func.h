@@ -698,8 +698,9 @@ static void conv1d_TF_folding(size_t batch_size, size_t input_width, size_t in_c
     }
 }
 void plot_result(int batch_size, double y_axis[batch_size]);
-static void post_processing(int batch_size, int gesN, double result_matrix[batch_size][gesN],int K){
-    /**Top-K Majority Voting Rule**/
+static void post_processing(int batch_size, int gesN, elem_t result_matrix[batch_size][gesN],int K){
+    /**Top-K Majority Voting Rule
+     * for speedup we use the result from QDense**/
     int max_res1D[batch_size];
     double y_axis[batch_size+2]; //for plot
     for (int i = 0; i < batch_size; ++i) {
@@ -719,7 +720,7 @@ static void post_processing(int batch_size, int gesN, double result_matrix[batch
 
     y_axis[batch_size] = 12, y_axis[batch_size+1] = 0; //for plot boundary
 
-    //plot_result(batch_size, y_axis);
+    plot_result(batch_size, y_axis);
     //find argmax from softmax result
     int count = 0;
     int previous_predict = max_res1D[0];

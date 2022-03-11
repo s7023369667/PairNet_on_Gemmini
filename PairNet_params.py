@@ -125,7 +125,7 @@ def make_pairNetQDEQ_params(batch_size, input_width, stride_size, gesN, header_n
 
 
 def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_signals, path, true_label: list,
-                            len_label, header_name='./include/Qpairnet_params.h'):
+                            len_label, header_name='./include/Qpairnet_params_16.h'):
     """feed into PairNet_ALLQ_main.c"""
     f = open(header_name, "w+")
     f.write(f"//{datetime.datetime.now()}\n")
@@ -187,7 +187,7 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
                                                           q_max=127, q_min=z3_convBN)
 
                 f.write(f"const double downScalar{layer.name[-2:]} = {s1 * s2_convBN / s4_convBN};\n")
-                f.write(f"const elem_t z3{layer.name[-2:]} = {z4_convBN};\n")
+                f.write(f"const elem_t z3{layer.name[-2:]} = {z3_convBN};\n")
                 f.write(f"const elem_t z4{layer.name[-2:]} = {z4_convBN};\n")
                 """Quantization"""
                 # reshape input_feature
@@ -333,11 +333,11 @@ def make_pairNetALLQ_params(batch_size, input_width, stride_size, gesN, input_si
     f.write('#endif\n')
     f.close()
     dst = '/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/include/Qpairnet_params.h'
-    shutil.copyfile('./include/Qpairnet_params.h', dst)
+    shutil.copyfile(header_name, dst)
 
 
 def make_pairNet_mc2conv1d_params(batch_size, input_width, stride_size, gesN, input_signals, path, true_label: list,
-                                  len_label, header_name='./include/Qpairnet_mc2conv1d_params.h'):
+                                  len_label, header_name='./include/Qpairnet_mc2conv1d_params_16.h'):
     """feed into 1d_with_ch.c"""
     f = open(header_name, "w+")
     f.write(f"//{datetime.datetime.now()}\n")
@@ -400,7 +400,7 @@ def make_pairNet_mc2conv1d_params(batch_size, input_width, stride_size, gesN, in
                 s4_convBN, z4_convBN = cal_scaleZeroPoint(r_max=np.max(fp_result), r_min=0,
                                                           q_max=127, q_min=z3_convBN)
                 f.write(f"const double downScalar{layer.name[-2:]} = {s1 * s2_convBN / s4_convBN};\n")
-                f.write(f"const elem_t z3{layer.name[-2:]} = {z4_convBN};\n")
+                f.write(f"const elem_t z3{layer.name[-2:]} = {z3_convBN};\n")
                 f.write(f"const elem_t z4{layer.name[-2:]} = {z4_convBN};\n")
                 """Quantization"""
                 # reshape input_feature
@@ -536,6 +536,6 @@ def make_pairNet_mc2conv1d_params(batch_size, input_width, stride_size, gesN, in
     f.write('#endif\n')
     f.close()
     dst = '/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/include/Qpairnet_mc2conv1d_params.h'
-    shutil.copyfile('./include/Qpairnet_mc2conv1d_params.h', dst)
+    shutil.copyfile(header_name, dst)
 
 

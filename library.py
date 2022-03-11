@@ -86,7 +86,7 @@ def make_window_siginals(txt_path):
 
 def cal_scaleZeroPoint(r_max, r_min, q_max=127, q_min=-128):
     scale = (r_max - r_min) / (q_max - q_min)
-    zeroPoint = q_max - r_max / scale
+    zeroPoint = q_max - (r_max / scale)
     zeroPoint = np.clip(zeroPoint, q_min, q_max)
     zeroPoint = int(zeroPoint)
     return scale, zeroPoint
