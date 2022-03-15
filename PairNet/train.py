@@ -127,10 +127,10 @@ def train():
     Model_Name_Now_Time = time.strftime("%Y%m%d", time.localtime())
     window_size = 50
     gesN = 12
-    channel = 16
-    Model_HDF5_name = f'./model/pairnet_noRelu_model{channel}_{gesN}_{Model_Name_Now_Time}.h5'
+    channel = 32
+    Model_HDF5_name = f'./model/pairnet_model{channel}_{gesN}_{Model_Name_Now_Time}.h5'
 
-    training_path = '../Oap/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)'
+    training_path = '../OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)'
     train, train_label = get_samples(get_files(training_path, gesN))
 
     x_train, y_train, x_val, y_val = preprocessing(train, train_label,gesN)
