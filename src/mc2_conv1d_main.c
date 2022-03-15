@@ -12,7 +12,7 @@
 #include "include/gemmini_nn.h"
 #include "include/gemmini_params.h"
 #include "include/Qgesture_signals.h"
-#include "include/Qpairnet_mc2conv1d_params_16.h"
+#include "include/Qpairnet_params12_64.h"
 
 
 void Relu_Clip(int batch_size, int out_dim, int out_channels, elem_t C[batch_size][out_dim][out_channels],
@@ -50,7 +50,7 @@ int main () {
     enum tiled_matmul_type_t tiled_matmul_type = WS;
     start = read_cycles();
     ////1st layer
-    batch_forloop(tiled_matmul_type, RELU_NUM, (float )downScalar_1, z4_1, (elem_t *)gesture_signals, (elem_t *)QConv_BN_1,
+    batch_forloop(tiled_matmul_type, RELU_NUM, (float )downScalar_1, z4_1, (elem_t *)gesture_signals, (elem_t *)QConv_BN_mc2_1,
                   (acc_t *)QConv_BN_bias_1, QConv_BN_1_out, PE, QConv_BN_1_params.input_width, QConv_BN_1_params.stride_size,
                   QConv_BN_1_params.kernel_size, QConv_BN_1_params.in_channels, QConv_BN_1_params.batch_size,
                   QConv_BN_1_params.out_channels, QConv_BN_1_params.output_width);
@@ -59,7 +59,7 @@ int main () {
 //    block_print1(QConv_BN_1_params.batch_size,QConv_BN_1_params.output_width, QConv_BN_1_params.out_channels,QConv_BN_1_out);
 
     ////2nd layer
-    batch_forloop(tiled_matmul_type, RELU_NUM, (float )downScalar_2, z4_2, (elem_t *)QConv_BN_1_out, (elem_t *)QConv_BN_2,
+    batch_forloop(tiled_matmul_type, RELU_NUM, (float )downScalar_2, z4_2, (elem_t *)QConv_BN_1_out, (elem_t *)QConv_BN_mc2_2,
                   (acc_t *)QConv_BN_bias_2, QConv_BN_2_out, PE, QConv_BN_2_params.input_width, QConv_BN_2_params.stride_size,
                   QConv_BN_2_params.kernel_size, QConv_BN_2_params.in_channels, QConv_BN_2_params.batch_size,
                   QConv_BN_2_params.out_channels, QConv_BN_2_params.output_width);
@@ -68,7 +68,7 @@ int main () {
 //              z3_2, z4_2);
 
     ////3rd layer
-    batch_forloop(tiled_matmul_type, RELU_NUM, (float )downScalar_3, z4_3, (elem_t *)QConv_BN_2_out, (elem_t *)QConv_BN_3,
+    batch_forloop(tiled_matmul_type, RELU_NUM, (float )downScalar_3, z4_3, (elem_t *)QConv_BN_2_out, (elem_t *)QConv_BN_mc2_3,
                   (acc_t *)QConv_BN_bias_3, QConv_BN_3_out, PE, QConv_BN_3_params.input_width, QConv_BN_3_params.stride_size,
                   QConv_BN_3_params.kernel_size, QConv_BN_3_params.in_channels, QConv_BN_3_params.batch_size,
                   QConv_BN_3_params.out_channels, QConv_BN_3_params.output_width);
@@ -76,7 +76,7 @@ int main () {
 //              z3_3, z4_3);
 //    block_print1(QConv_BN_3_params.batch_size,QConv_BN_3_params.output_width, QConv_BN_3_params.out_channels,QConv_BN_3_out);
     ////4th layer
-    batch_forloop(tiled_matmul_type, RELU_NUM, (float )downScalar_4, z4_4, (elem_t *)QConv_BN_3_out, (elem_t *)QConv_BN_4,
+    batch_forloop(tiled_matmul_type, RELU_NUM, (float )downScalar_4, z4_4, (elem_t *)QConv_BN_3_out, (elem_t *)QConv_BN_mc2_4,
                   (acc_t *)QConv_BN_bias_4, QConv_BN_4_out, PE, QConv_BN_4_params.input_width, QConv_BN_4_params.stride_size,
                   QConv_BN_4_params.kernel_size, QConv_BN_4_params.in_channels, QConv_BN_4_params.batch_size,
                   QConv_BN_4_params.out_channels, QConv_BN_4_params.output_width);
@@ -84,7 +84,7 @@ int main () {
 //              z3_4, z4_4);
 //    block_print1(QConv_BN_4_params.batch_size,QConv_BN_4_params.output_width, QConv_BN_4_params.out_channels,QConv_BN_4_out);
     ////5th layer
-    batch_forloop(tiled_matmul_type, RELU_NUM, (float )downScalar_5, z4_5, (elem_t *)QConv_BN_4_out, (elem_t *)QConv_BN_5,
+    batch_forloop(tiled_matmul_type, RELU_NUM, (float )downScalar_5, z4_5, (elem_t *)QConv_BN_4_out, (elem_t *)QConv_BN_mc2_5,
                   (acc_t *)QConv_BN_bias_5, QConv_BN_5_out, PE, QConv_BN_5_params.input_width, QConv_BN_5_params.stride_size,
                   QConv_BN_5_params.kernel_size, QConv_BN_5_params.in_channels, QConv_BN_5_params.batch_size,
                   QConv_BN_5_params.out_channels, QConv_BN_5_params.output_width);
