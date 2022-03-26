@@ -124,7 +124,7 @@ def make_pairNetQDEQ_params(batch_size, input_width, stride_size, gesN, header_n
     f.close()
 
 
-def make_pairnet_params(batch_size, input_width, stride_size, gesN, input_signals, path, true_label: list,
+def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signals, path, true_label: list,
                         header_name='./include/Qpairnet_params_32.h'):
     """feed into PairNet_ALLQ_main.c b & mc2_conv1d_main"""
     f = open(header_name, "w+")

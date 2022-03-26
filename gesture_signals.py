@@ -74,5 +74,5 @@ def make_Qsiginals(windows, header_name='./include/Qgesture_signals.h'):
     f.write("};\n")
     f.write("#endif")
     f.close()
-    dst = '/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/include/Qgesture_signals.h'
-    shutil.copyfile('./include/Qgesture_signals.h', dst)
+    dst = f'/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/{header_name[2:]}'
+    shutil.copyfile(header_name, dst)

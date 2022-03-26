@@ -59,7 +59,7 @@ def test(test_dir, gesN, main_operatation, model_path):
                 print(txt)
                 windows = make_window_siginals(txt)
                 make_Qsiginals(windows)
-                make_pairnet_params(batch_size=windows.shape[0], input_width=50, stride_size=1,
+                make_Qpairnet_params(batch_size=windows.shape[0], input_width=50, stride_size=1,
                                     input_signals=windows, gesN=gesN, path=model_path, true_label=txt_label,
                                     header_name=f'./include/Qpairnet_params.h')
                 if main_operatation == 'conv1d':
@@ -97,19 +97,19 @@ def get_label(file_label):
 
 
 def main():
-    path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110149_(Wen)_H50_N3_K9-8-4.txt'
-    # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/2-1-6-5/TD20181001-233625_(Wen)_H50_N4_K2-1-6-5.txt'
+    # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110149_(Wen)_H50_N3_K9-8-4.txt'
+    path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/2-1-6-5/TD20181001-233625_(Wen)_H50_N4_K2-1-6-5.txt'
     # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/4-3/TD20181012-160250_(Eric)_H50_N2_K4-3.txt'
     gesN = 12
     channel = 64
     model_path = f"PairNet/model/pairnet_model64_12_20220308.h5"
-    true_label = [9, 8, 4]
+    true_label = list(map(int, (path.split('/')[-2]).split('-')))
     windows = make_window_siginals(path)
-    make_Qsiginals(windows)
     """feed into mc2_conv1d_main.c & pairNet_ALLQ_main.c"""
-    make_pairnet_params(batch_size=windows.shape[0], input_width=50, stride_size=1,
+    make_Qsiginals(windows, header_name=f'./include/Qgesture_signals_{"".join([str(i) for i in true_label])}.h')
+    make_Qpairnet_params(batch_size=windows.shape[0], input_width=50, stride_size=1,
                         input_signals=windows, gesN=gesN, path=model_path, true_label=true_label,
-                        header_name=f'./include/Qpairnet_params12_64.h')
+                        header_name=f'./include/Qpairnet_params{gesN}_{channel}_{"".join([str(i) for i in true_label])}.h')
     # test('PairNet/1071109_test_1-2-3-4_New12_test/', gesN, main_operatation="matmul", model_path=model_path)
 
 

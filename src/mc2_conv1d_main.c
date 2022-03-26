@@ -11,8 +11,8 @@
 #include "include/gemmini.h"
 #include "include/gemmini_nn.h"
 #include "include/gemmini_params.h"
-#include "include/Qgesture_signals.h"
-#include "include/Qpairnet_params12_64.h"
+#include "include/Qgesture_signals_2165.h"
+#include "include/Qpairnet_params12_64_2165.h"
 
 
 void Relu_Clip(int batch_size, int out_dim, int out_channels, elem_t C[batch_size][out_dim][out_channels],

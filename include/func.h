@@ -625,9 +625,10 @@ static void QMatmul(size_t I, size_t K, size_t J, const elem_t matrixA[I][K],con
     }
 }
 
+
 static void QDense(int I, int K, int J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[I][J],
                    elem_t matrixC[I][J], double downScalar){
-    /**without pre-compute bias**/
+    /**CPU? Gemmini?**/
 //    enum tiled_matmul_type_t tiled_matmul_type = WS;
 //    tiled_matmul_auto(I, J, K, (elem_t*)matrixA, (elem_t*)matrixB,(acc_t*)bias, (elem_t*)matrixC,
 //                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,

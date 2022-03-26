@@ -10,7 +10,7 @@
 //#include "include/gemmini.h"
 //#include "include/gemmini_nn.h"
 //#include "include/gemmini_params.h"
-#include "Qpairnet_params12_64.h"
+#include "Qpairnet_params12_64_2165.h"
 #include "Qgesture_signals.h"
 //#include "include/Qpairnet_params_16.h"
 
