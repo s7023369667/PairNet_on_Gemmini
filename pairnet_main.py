@@ -1,5 +1,7 @@
+import cv2
+
 from gesture_signals import *
-from PairNet_params import *
+from pairnet_params import *
 from library import *
 import subprocess as sp
 from pycm import *
@@ -43,7 +45,7 @@ def run_gemmini(main_file='Qpairnet_matmul_main'):
     return result
 
 
-def test(test_dir, gesN, main_operatation):
+def test(test_dir, gesN, main_operatation, model_path):
     pre_result, gt_result = [], []
     for file_label in os.listdir(test_dir):
         txt_label = get_label(file_label)
@@ -58,7 +60,7 @@ def test(test_dir, gesN, main_operatation):
                 windows = make_window_siginals(txt)
                 make_Qsiginals(windows)
                 make_pairnet_params(batch_size=windows.shape[0], input_width=50, stride_size=1,
-                                    input_signals=windows, gesN=gesN, path=model_path, true_label=true_label,
+                                    input_signals=windows, gesN=gesN, path=model_path, true_label=txt_label,
                                     header_name=f'./include/Qpairnet_params.h')
                 if main_operatation == 'conv1d':
                     pre = run_gemmini(main_file='mc2_conv1d_main')
@@ -94,7 +96,7 @@ def get_label(file_label):
     return txt_label
 
 
-if __name__ == '__main__':
+def main():
     path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110149_(Wen)_H50_N3_K9-8-4.txt'
     # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/2-1-6-5/TD20181001-233625_(Wen)_H50_N4_K2-1-6-5.txt'
     # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/4-3/TD20181012-160250_(Eric)_H50_N2_K4-3.txt'
@@ -108,5 +110,8 @@ if __name__ == '__main__':
     make_pairnet_params(batch_size=windows.shape[0], input_width=50, stride_size=1,
                         input_signals=windows, gesN=gesN, path=model_path, true_label=true_label,
                         header_name=f'./include/Qpairnet_params12_64.h')
-    ###test('PairNet/1071109_test_1-2-3-4_New12_test/', gesN, main_operatation="matmul")
+    # test('PairNet/1071109_test_1-2-3-4_New12_test/', gesN, main_operatation="matmul", model_path=model_path)
 
+
+if __name__ == '__main__':
+    main()
