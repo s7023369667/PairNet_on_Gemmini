@@ -206,7 +206,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                 Q_feature = Q_result
                 """write QConv_BN"""
                 f.write(
-                    f"const elem_t QConv_BN{layer.name[-2:]}[{filters}][{in_channels}][{out_channels}]=\n")
+                    f"const elem_t QConv_BN{layer.name[-2:]}[{filters}][{in_channels}][{out_channels}] row_align(1)=\n")
                 f.write('{')
                 for i in range(wrapper):
                     for j in range(filters):
@@ -229,7 +229,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                 f.write('};\n')
                 """write QConv_BN_mc2"""
                 f.write(
-                    f"const elem_t QConv_BN_mc2{layer.name[-2:]}[{kernel_size * in_channels}][{out_channels}]=\n")
+                    f"const elem_t QConv_BN_mc2{layer.name[-2:]}[{kernel_size * in_channels}][{out_channels}] row_align(1)=\n")
                 f.write('{')
                 for i in range(QReshaped_kernel.shape[0]):
                     f.write('{')
@@ -245,7 +245,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                 f.write('};\n')
                 # write pre-computed QConv_BN_bias
                 f.write(
-                    f"const acc_t QConv_BN_bias{layer.name[-2:]}[{batch_size}][{output_width}][{out_channels}] = \n")
+                    f"const acc_t QConv_BN_bias{layer.name[-2:]}[{batch_size}][{output_width}][{out_channels}] row_align_acc(1) = \n")
                 f.write("\n{")
                 for i in range(batch_size):
                     f.write("{")
@@ -271,7 +271,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                         f'.out_channels = {out_channels},.kernel_size ={kernel_size},.stride_size={stride_size},'
                         f'.padding_front= {padding_front},.padding_back= {padding_back},.output_width={output_width}}};\n')
                 f.write(
-                    f'static elem_t QConv_BN{layer.name[-2:]}_out[{batch_size}][{output_width}][{out_channels}];\n')
+                    f'elem_t QConv_BN{layer.name[-2:]}_out[{batch_size}][{output_width}][{out_channels}] row_align(1);\n')
                 input_width = output_width
                 stride_size = 2
                 s1, z1 = s4_convBN, z4_convBN

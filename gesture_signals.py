@@ -51,7 +51,7 @@ def make_Qsiginals(windows, header_name='./include/Qgesture_signals.h'):
     f.write(f'const double scale_signals = {scale};\n')
     f.write(f'const elem_t zeroPoint_signals = {zeroPoint};\n')
     f.write(
-        f"static const elem_t gesture_signals[{Q_windows.shape[0]}][{Q_windows.shape[2]}][{Q_windows.shape[3]}]=")
+        f"const elem_t gesture_signals[{Q_windows.shape[0]}][{Q_windows.shape[2]}][{Q_windows.shape[3]}] row_align(1)=")
     f.write("\n{")
     for i in range(Q_windows.shape[0]):
         f.write("{")
