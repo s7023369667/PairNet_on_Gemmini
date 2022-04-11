@@ -110,7 +110,7 @@ int main(){
     post_processing(QConv_BN_5_params.batch_size, gesN, QDense_out,LEN_LABLE);
     end = read_cycles();
     printf("Cost(clock cycles) = %lu\n", end - start);
-    float t_cost = (float )(end - start) / 31250000.0;
+    double t_cost = (double )(end - start) / 31250000.0;
     printf("Cost(Second) = %f\n", t_cost);
     printf("SUCCESS\n");
 }
