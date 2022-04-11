@@ -125,7 +125,7 @@ def make_pairNetQDEQ_params(batch_size, input_width, stride_size, gesN, header_n
 
 
 def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signals, path, true_label: list,
-                        header_name='./include/Qpairnet_params_32.h'):
+                         header_name='./include/Qpairnet_params_32.h'):
     """feed into PairNet_ALLQ_main.c b & mc2_conv1d_main"""
     f = open(header_name, "w+")
     f.write(f"//{datetime.datetime.now()}\n")
@@ -138,6 +138,10 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
     f.write("struct Conv1d_Params {\n\tint batch_size;\n\tint input_width;\n\tint in_channels;\n\t"
             "int out_channels;\n\tint kernel_size;\n\tint stride_size;\n\t""int padding_front;\n\t"
             "int padding_back;\n\tint output_width;\n\tdouble out_scale;\n\t};\n")
+    for label in true_label:
+        if label >= gesN:
+            print(f"{label} > {gesN}")
+            raise ValueError
     gt = ''.join([str(i) + ' ' for i in true_label])
     f.write(f'#define TRUE_LABEL \"{gt}\"\n')
     model_pairNet = load_model(path)
@@ -186,9 +190,9 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                 s4_convBN, z4_convBN = cal_scaleZeroPoint(r_max=np.max(fp_result), r_min=0,
                                                           q_max=127, q_min=z3_convBN)
 
-                f.write(f"const double downScalar{layer.name[-2:]} = {s1 * s2_convBN / s4_convBN};\n")
-                f.write(f"const elem_t z3{layer.name[-2:]} = {z3_convBN};\n")
-                f.write(f"const elem_t z4{layer.name[-2:]} = {z4_convBN};\n")
+                f.write(f"static const double downScalar{layer.name[-2:]} = {s1 * s2_convBN / s4_convBN};\n")
+                f.write(f"static const elem_t z3{layer.name[-2:]} = {z3_convBN};\n")
+                f.write(f"static const elem_t z4{layer.name[-2:]} = {z4_convBN};\n")
                 """Quantization"""
                 # reshape input_feature
                 QReshaped_feature = reshape_feature(Q_feature, kernel_size, stride_size, output_width)
@@ -206,7 +210,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                 Q_feature = Q_result
                 """write QConv_BN"""
                 f.write(
-                    f"const elem_t QConv_BN{layer.name[-2:]}[{filters}][{in_channels}][{out_channels}] row_align(1)=\n")
+                    f"static const elem_t QConv_BN{layer.name[-2:]}[{filters}][{in_channels}][{out_channels}] row_align(1)=\n")
                 f.write('{')
                 for i in range(wrapper):
                     for j in range(filters):
@@ -229,7 +233,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                 f.write('};\n')
                 """write QConv_BN_mc2"""
                 f.write(
-                    f"const elem_t QConv_BN_mc2{layer.name[-2:]}[{kernel_size * in_channels}][{out_channels}] row_align(1)=\n")
+                    f"static const elem_t QConv_BN_mc2{layer.name[-2:]}[{kernel_size * in_channels}][{out_channels}] row_align(1)=\n")
                 f.write('{')
                 for i in range(QReshaped_kernel.shape[0]):
                     f.write('{')
@@ -245,7 +249,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                 f.write('};\n')
                 # write pre-computed QConv_BN_bias
                 f.write(
-                    f"const acc_t QConv_BN_bias{layer.name[-2:]}[{batch_size}][{output_width}][{out_channels}] row_align_acc(1) = \n")
+                    f"static const acc_t QConv_BN_bias{layer.name[-2:]}[{batch_size}][{output_width}][{out_channels}] row_align_acc(1) = \n")
                 f.write("\n{")
                 for i in range(batch_size):
                     f.write("{")
@@ -271,7 +275,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                         f'.out_channels = {out_channels},.kernel_size ={kernel_size},.stride_size={stride_size},'
                         f'.padding_front= {padding_front},.padding_back= {padding_back},.output_width={output_width}}};\n')
                 f.write(
-                    f'elem_t QConv_BN{layer.name[-2:]}_out[{batch_size}][{output_width}][{out_channels}] row_align(1);\n')
+                    f'static elem_t QConv_BN{layer.name[-2:]}_out[{batch_size}][{output_width}][{out_channels}] row_align(1);\n')
                 input_width = output_width
                 stride_size = 2
                 s1, z1 = s4_convBN, z4_convBN
@@ -292,10 +296,10 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                 fp_feature = fp_result
                 best_minn_res, best_maxx_res = optimal_MinMax(fp_result)
                 s3_dense, z3_dense = cal_scaleZeroPoint(r_max=best_maxx_res, r_min=best_minn_res)
-                f.write(f"const double downScalar_dense = {s1 * s2_dense / s3_dense};\n")
-                f.write(f"const elem_t z2_dense = {z2_dense};\n")
-                f.write(f"const double s3_dense = {s3_dense};\n")
-                f.write(f"const elem_t z3_dense = {z3_dense};\n")
+                f.write(f"static const double downScalar_dense = {s1 * s2_dense / s3_dense};\n")
+                f.write(f"static const elem_t z2_dense = {z2_dense};\n")
+                f.write(f"static const double s3_dense = {s3_dense};\n")
+                f.write(f"static const elem_t z3_dense = {z3_dense};\n")
                 """Quantization"""
                 # pre-compute bias
                 KS_inChannel = QDense.shape[0]
@@ -304,7 +308,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                 Q_result = Qconv1d(Q_feature, QDense, QDense_bias, batch_size, KS_inChannel, gesN,
                                    s1 * s2_dense / s3_dense, 0, 0, is_conv=False)
                 Q_feature = Q_result
-                f.write(f"const elem_t QDense_params[{QDense.shape[0]}][{QDense.shape[1]}] = \n")
+                f.write(f"static const elem_t QDense_params[{QDense.shape[0]}][{QDense.shape[1]}] = \n")
                 f.write('{')
                 for i in range(QDense.shape[0]):
                     f.write('{')
@@ -318,7 +322,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                     else:
                         f.write('}')
                 f.write('};\n')
-                f.write(f"const acc_t QDense_bias[{QDense_bias.shape[0]}][{QDense_bias.shape[1]}] = \n")
+                f.write(f"static const acc_t QDense_bias[{QDense_bias.shape[0]}][{QDense_bias.shape[1]}] = \n")
                 f.write('{')
                 for i in range(QDense_bias.shape[0]):
                     f.write('{')
@@ -332,7 +336,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                     else:
                         f.write('}')
                 f.write('};\n')
-                f.write(f"elem_t QDense_out[{batch_size}][{gesN}];\n")
+                f.write(f"static elem_t QDense_out[{batch_size}][{gesN}];\n")
 
         elif 'global_average_pooling1d' in layer.name:
             fp_result = tf.reshape(fp_feature, [batch_size, 3, out_channels])
@@ -342,7 +346,7 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
             Q_result = tf.cast(Q_result, tf.float32)
             Q_result = tf.keras.layers.GlobalAveragePooling1D()(Q_result)
             Q_feature = tf.round(Q_result)
-            f.write(f"elem_t QGap_out[{batch_size}][{out_channels}];\n")
+            f.write(f"static elem_t QGap_out[{batch_size}][{out_channels}];\n")
     # f.write(f"double deq_softmax_out[{batch_size}][{gesN}];\n")
     f.write('#endif\n')
     f.close()

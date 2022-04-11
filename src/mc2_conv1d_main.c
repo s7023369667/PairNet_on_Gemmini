@@ -41,12 +41,19 @@ void GAP(int batch_size, int input_width, int in_channels, elem_t input_feature[
 }
 
 int main () {
+    if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+        /**locks all pages mapped into the address space of the calling process.
+         * This includes the pages of the code, data and stack segment, as well as shared libraries, user space kernel data, shared memory, and memory-mapped files.
+         * All mapped pages are guaranteed to be resident in RAM when the call returns successfully; the pages are guaranteed to stay in RAM until later unlocked.*/
+        perror("mlockall failed");
+        exit(1);
+    }
+    uint64_t start, end, cost;
     /*****PairNet Quantized*****/
     printf("PairNet conv1d with Gemmini\n");
     printf("Input Gesture : %s \n", TRUE_LABEL);
     int gesN = GESN;
     gemmini_flush(0);
-    uint64_t start, end, cost;
     enum tiled_matmul_type_t tiled_matmul_type = WS;
     start = read_cycles();
     ////1st layer

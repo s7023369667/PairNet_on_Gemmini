@@ -97,17 +97,19 @@ def get_label(file_label):
 
 
 def main():
-    # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110149_(Wen)_H50_N3_K9-8-4.txt'
+    path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110149_(Wen)_H50_N3_K9-8-4.txt'
     # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/2-1-6-5/TD20181001-233625_(Wen)_H50_N4_K2-1-6-5.txt'
     # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/4-3/TD20181012-160250_(Eric)_H50_N2_K4-3.txt'
     # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/1/D20180914-114254_(Wen)_H50_N1_K1.txt'
     # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/1-2/TD20180925-134426_(Wen)_H50_N2_K1-2.txt'
     # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/4-2/TD20180925-134940_(Wen)_H50_N2_K4-2.txt'
-    path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/4-6-5/TD20180927-152632_(Wen)_H50_N3_K4-6-5.txt'
+    # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/2-10-5-9/TD20181108-155133_(Wen)_H50_N4_K2-10-5-9.txt'
+    # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/11-8-10/TD20181107-195515_(Wen)_H50_N3_K11-8-10.txt'
+    # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/2-11-3-1/TD20181010-124711_(Wen)_H50_N4_K2-11-3-1.txt'
 
-    gesN = 7
+    gesN = 12
     channel = 16
-    model_path = f"PairNet/model/pairnet_model16_7_20220216.h5"
+    model_path = f"PairNet/model/pairnet_model16_12_20220216.h5"
     true_label = list(map(int, (path.split('/')[-2]).split('-')))
     windows = make_window_siginals(path)
     """feed into mc2_conv1d_main.c & pairNet_ALLQ_main.c"""
