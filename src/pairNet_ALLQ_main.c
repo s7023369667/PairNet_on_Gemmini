@@ -5,7 +5,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
-//#include <sys/mman.h>
+#ifndef BAREMETAL
+#include <sys/mman.h>
+#endif
 #include "include/gemmini_custom.h"
 #include "include/func.h"
 #include "include/gemmini.h"
@@ -15,10 +17,12 @@
 #include "include/Qgesture_signals_65.h"
 
 int main(){
-    /*if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+#ifndef BAREMETAL
+    if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
         perror("mlockall failed");
         exit(1);
-    }*/
+    }
+#endif
     uint64_t start, end;
     /*****PairNet Quantized*****/
     printf("PairNet matmul with Gemmini\n");
@@ -106,7 +110,7 @@ int main(){
     post_processing(QConv_BN_5_params.batch_size, gesN, QDense_out,LEN_LABLE);
     end = read_cycles();
     printf("Cost(clock cycles) = %lu\n", end - start);
-    float t_cost = (float )(end - start) / 31250000;
+    float t_cost = (float )(end - start) / 31250000.0;
     printf("Cost(Second) = %f\n", t_cost);
     printf("SUCCESS\n");
 }
