@@ -77,7 +77,7 @@ static void mc2_conv1d(int dataflow, int act, acc_scale_t scale, elem_t relu_num
     gemmini_mc2_config_ldB(out_channels, 1.0);
     gemmini_mc2_config_ldD(out_channels * sizeof(acc_t), 1.0);
     /****************************************/
-    /* gemmini LOOP_WS config
+    /* gemmini LOOP_WS config*/
     /****************************************/
     //   gemmini_mc2_config_ex(dataflow,act,1 ,0);
     // //gemmini_extended_config_ex(dataflow, act, 0, scale, relu6_shift, 1, a_transpose, b_transpose);
