@@ -108,7 +108,7 @@ def main():
     # path = 'OapNet/test/1100920_test_(J&W&D&j&in0)/2-11-3-1/TD20181010-124711_(Wen)_H50_N4_K2-11-3-1.txt'
 
     gesN = 12
-    channel = 16
+    channel = 32
     model_path = f"PairNet/model/pairnet_model16_12_20220216.h5"
     true_label = list(map(int, (path.split('/')[-2]).split('-')))
     windows = make_window_siginals(path)
@@ -116,7 +116,7 @@ def main():
     make_Qsiginals(windows, header_name=f'./include/Qgesture_signals_{"".join([str(i) for i in true_label])}.h')
     make_Qpairnet_params(batch_size=windows.shape[0], input_width=50, stride_size=1,
                          input_signals=windows, gesN=gesN, path=model_path, true_label=true_label,
-                         header_name=f'./include/Qpairnet_params{gesN}_{channel}_{"".join([str(i) for i in true_label])}.h')
+                         header_name=f'./include/Qpairnet_params{gesN}_{channel}_{"".join([str(i) for i in true_label])}_clip.h')
     # test('PairNet/1071109_test_1-2-3-4_New12_test/', gesN, main_operatation="matmul", model_path=model_path)
 
 

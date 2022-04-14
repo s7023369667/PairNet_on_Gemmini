@@ -87,7 +87,6 @@ def Qconv1d(reshaped_feature: np.ndarray, reshaped_kernel: np.ndarray, kernel_bi
 def pre_compute_bias(input_feature: np.ndarray, kernel: np.ndarray, bias: np.ndarray, KS_inChannel,
                      s1, z1, s2, z2, s2_b, z2_b, s3, z3, relu_s4, relu_z4, is_conv=True):
     batch_size = input_feature.shape[0]
-
     if is_conv:
         out_width = bias.shape[0]
         out_channels = bias.shape[1]

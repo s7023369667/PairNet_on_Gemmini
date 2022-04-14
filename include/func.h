@@ -604,6 +604,7 @@ static void QMatmul(size_t I, size_t K, size_t J, const elem_t matrixA[I][K],con
             tmp_res = 0;
         }
     }
+    /**Gemmini*/
 //    enum tiled_matmul_type_t tiled_matmul_type = WS;
 //    tiled_matmul_auto(I, J,K, (elem_t*)matrixA, (elem_t*)matrixB,(acc_t*)total_bias, (elem_t*)matrixC,
 //                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,
@@ -613,6 +614,7 @@ static void QMatmul(size_t I, size_t K, size_t J, const elem_t matrixA[I][K],con
 //            matrixC[i][j] = QRelu_Clip(matrixC[i][j], Z3, 0, false);
 //        }
 //    }
+    /**cpu*/
     for (int i = 0; i < I; ++i) {
         double tmp_res = 0.0;
         for (int j = 0; j < J; ++j) {
@@ -625,15 +627,17 @@ static void QMatmul(size_t I, size_t K, size_t J, const elem_t matrixA[I][K],con
     }
 }
 
-
-static void QDense(int I, int K, int J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[I][J],
+static void QDense_Gemmini(int I, int K, int J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[I][J],
                    elem_t matrixC[I][J], double downScalar){
-    /**CPU? Gemmini?**/
-//    enum tiled_matmul_type_t tiled_matmul_type = WS;
-//    tiled_matmul_auto(I, J, K, (elem_t*)matrixA, (elem_t*)matrixB,(acc_t*)bias, (elem_t*)matrixC,
-//                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,
-//                      (float )downScalar,0,false,false,false,false,false,3,tiled_matmul_type);
+    /**Gemmini**/
+    enum tiled_matmul_type_t tiled_matmul_type = WS;
+    tiled_matmul_auto(I, J, K, (elem_t*)matrixA, (elem_t*)matrixB,(acc_t*)bias, (elem_t*)matrixC,
+                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,
+                      (float )downScalar,0,false,false,false,false,false,3,tiled_matmul_type);
 
+static void QDense_cpu(int I, int K, int J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[I][J],
+                   elem_t matrixC[I][J], double downScalar){
+    /**CPU**/
     for (int i = 0; i < I; ++i) {
         double tmp_res = 0.0;
         for (int j = 0; j < J; ++j) {
