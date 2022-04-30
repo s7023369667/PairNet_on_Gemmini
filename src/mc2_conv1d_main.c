@@ -136,7 +136,7 @@ int main () {
     //     printf("\n");
     // }
 
-    QDense(QConv_BN_5_params.batch_size,QConv_BN_5_params.in_channels, gesN, QGap_out, QDense_params, QDense_bias, QDense_out,
+    QDense_cpu(QConv_BN_5_params.batch_size,QConv_BN_5_params.in_channels, gesN, QGap_out, QDense_params, QDense_bias, QDense_out,
            (float )downScalar_dense);
 
     // for (int i = 0; i < QConv_BN_5_params.batch_size; ++i) {

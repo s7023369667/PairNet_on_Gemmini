@@ -1,9 +1,7 @@
 // func.h
 // Created by sam on 2021/12/22.
 // BE-AWARE :
-//  Gemmini only accept to import
-//  your custom function in <file.h>,
-//  unaccept to import <file.c>.
+//  spike Gemmini only accept to import your custom function in <file.h>, unaccept to import <file.c>.
 
 #ifndef GEMMINI_PROJECTS_FUNC_H
 #define GEMMINI_PROJECTS_FUNC_H
@@ -11,6 +9,7 @@
 //#include "include/gemmini_params.h"
 //#include "include/gemmini_nn.h"
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
@@ -53,6 +52,7 @@ static double rounding(double x){
 }
 
 static int32_t round_near_even(double x){
+    /**rounding to nearest integer with one more constrain even number**/
     const double floatx = x;
     const int32_t  intx = (int32_t )floatx;
     int32_t  next = 0;
@@ -119,13 +119,13 @@ static void SoftMax(int batch_size, int in_channels, double input_feature[batch_
         }
 
     }
-    for (int i = 0; i < batch_size; ++i) {
-        for (int j = 0; j < in_channels; ++j) {
-            printf("%f ", input_feature[i][j]);
-        }
-        printf("\n");
-    }
-    printf("\n");
+//    for (int i = 0; i < batch_size; ++i) {
+//        for (int j = 0; j < in_channels; ++j) {
+//            printf("%f ", input_feature[i][j]);
+//        }
+//        printf("\n");
+//    }
+//    printf("\n");
     //write_result(batch_size, in_channels,input_feature);
 }
 
@@ -151,7 +151,6 @@ static void QSoftMax(int batch_size, int in_channels,const elem_t input_feature[
 //    }
 //    printf("\n");
 }
-
 static void batch_normalization(int batch_size, int input_width, int in_channels, double  input_feature[batch_size][1][input_width][in_channels],
                                 const double params[4][in_channels]){
     /**
@@ -198,126 +197,6 @@ static void Qglobal_avg_pooling(int batch_size, int input_width, int in_channels
     }
 }
 
-static void group_normalize(int batch_size, int input_width, int in_channels, double input_feature[batch_size][1][input_width][in_channels],
-                            double params[2][in_channels], int G){
-    /**paper : https://arxiv.org/pdf/1803.08494v3.pdf**/
-    /**flatten**/
-    double flattend_feature[1][batch_size*input_width*in_channels];
-    int index = 0;
-    for (int i = 0; i < batch_size; ++i) {
-        for (int k = 0; k < input_width; ++k) {
-            for (int l = 0; l < in_channels; ++l) {
-                flattend_feature[0][index] = input_feature[i][0][k][l];
-                index += 1;
-            }
-        }
-    }
-    /**reshape : (N, G, C//G, H, W)**/
-    index = 0;
-    double reshape_feature[batch_size][G][(int )(in_channels/G)][1][input_width];
-    for (int i = 0; i < batch_size; ++i) {
-        for (int j = 0; j < G; ++j) {
-            for (int k = 0; k < (int )(in_channels/G); ++k) {
-                for (int l = 0; l < input_width; ++l) {
-                    reshape_feature[i][j][k][0][l] = flattend_feature[0][index];
-                    index += 1;
-                }
-            }
-        }
-    }
-
-    double eps = 0.00001;
-
-    for (int batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
-
-        for (int group = 0; group < G; ++group) {
-            double sum = 0;
-            double sum_var = 0;
-            /**calculate means*/
-            for (int channel = 0; channel < (int )(in_channels/G); ++channel) {
-                for (int w = 0; w < input_width; ++w) {
-                    sum += reshape_feature[batch_idx][group][channel][0][w];
-                }
-            }
-            double means = sum / (input_width * ((int )(in_channels/G)));
-            /**calculate variance*/
-            for (int channel = 0; channel < (int )(in_channels/G); ++channel) {
-                for (int w = 0; w < input_width; ++w) {
-                    sum_var += pow((reshape_feature[batch_idx][group][channel][0][w] - means), 2);
-                }
-            }
-            double variance = sum_var / (input_width * ((int )(in_channels/G)));
-            /**normalization*/
-            for (int channel = 0; channel < (int )(in_channels/G); ++channel) {
-                for (int w = 0; w < input_width; ++w) {
-                    reshape_feature[batch_idx][group][channel][0][w] = ((reshape_feature[batch_idx][group][channel][0][w] - means) / (sqrt(variance + eps))) ;
-                }
-            }
-        }
-    }
-    /**flatten*/
-    index = 0;
-    for (int i = 0; i < batch_size; ++i) {
-        for (int j = 0; j < G; ++j) {
-            for (int k = 0; k < (int) (in_channels / G); ++k) {
-                for (int l = 0; l < input_width; ++l) {
-                    flattend_feature[0][index] = reshape_feature[i][j][k][0][l];
-                    index += 1;
-                }
-            }
-        }
-    }
-    /**reshape : (N, H, W, C)*/
-    index = 0;
-    for (int i = 0; i < batch_size; ++i) {
-        for (int k = 0; k < input_width; ++k) {
-            for (int l = 0; l < in_channels; ++l) {
-                input_feature[i][0][k][l] = flattend_feature[0][index];
-                index += 1;
-            }
-        }
-    }
-    /**consider gamma & beta*/
-    for (int i = 0; i < batch_size; ++i) {
-        int col = 0;
-        for (int k = 0; k < in_channels; ++k) {
-            for (int l = 0; l < input_width; ++l) {
-                input_feature[i][0][l][k] = input_feature[i][0][l][k] * params[0][col] + params[1][col];
-            }
-            col += 1;
-        }
-    }
-}
-static void average_pooling(int batch_size, int input_width ,int in_channel, const double input_feature[batch_size][1][input_width][in_channel],
-                            int output_width,int out_channel,double output_feature[batch_size][1][output_width][out_channel],
-                            int stride_size, int kernel_size) {
-    /**padding = valid*/
-    for (int batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
-        for (int i = 0; i < in_channel; ++i) {
-            bool stop_flag = false;
-            int index = 0;
-            for (int j=0;j< input_width;j+=stride_size){
-                double sum = 0.0;
-                for (int k=0;k<kernel_size;++k){
-                    int curr = j + k;
-                    if (curr < input_width){
-                        sum += input_feature[batch_idx][0][curr][i];
-                    } else{
-                        stop_flag = true;
-                        break;
-                    }
-                }
-                if (stop_flag != true & index < output_width) {
-                    double tmp = (sum / (double) kernel_size);
-                    output_feature[batch_idx][0][index][i] = tmp;
-                    index += 1;
-                }else{
-                    break;
-                }
-            }
-        }
-    }
-}
 
 static void Relu(int batch_size, int input_width, int in_channels, double input_feature[batch_size][1][input_width][in_channels]){
     ////for PairNet_QDEQ_main.c
@@ -380,19 +259,6 @@ static elem_t QRelu_Clip(int32_t x,elem_t Z3, elem_t Z4 ,bool use_relu){
     return (elem_t)tmp;
 }
 
-static void matix_multiply(double ** matrixA, double ** matrixB, double **matrixC,size_t I, size_t K, size_t J){
-    for (int i = 0; i < I; ++i) {
-        double tmp_res = 0;
-        for (int j = 0; j < J; ++j) {
-            for (int k = 0; k < K; ++k) {
-                tmp_res += matrixA[i][k] * matrixB[k][j];
-            }
-            matrixC[i][j] = tmp_res;
-            tmp_res = 0;
-        }
-    }
-}
-
 static void Matmul(size_t I, size_t K, size_t J, double matrixA[I][K],const double matrixB[K][J],const double bias[J], double matrixC[I][J]){
     ////for PairNet_QDEQ_main.c
     for (int i = 0; i < I; ++i) {
@@ -404,21 +270,6 @@ static void Matmul(size_t I, size_t K, size_t J, double matrixA[I][K],const doub
             matrixC[i][j] = tmp_res + bias[j];
             tmp_res = 0;
         }
-    }
-}
-
-
-static void block_print(int batch_size, int output_width, int out_channels,
-                        elem_t out_feature[batch_size][1][output_width][out_channels]){
-    for (int i = 0; i < batch_size; ++i) {
-        printf("\tbatch %d\n", i);
-        for (int k = 0; k < output_width; ++k) {
-            for (int l = 0; l < out_channels; ++l) {
-                printf("\t%d\t ", out_feature[i][0][k][l]);
-            }
-            printf("\n");
-        }
-        printf("\n");
     }
 }
 
@@ -450,55 +301,6 @@ static void block_DEQ_print(int batch_size, int output_width, int out_channels, 
     }
 }
 
-static void write_result(int batch_size, int output_width, int out_channels, elem_t out_feature[batch_size][1][output_width][out_channels],
-                         char layer_name[10]){
-    //Before you run again , deleting LayerResult.txt
-    FILE *file = fopen("./LayerResult.txt", "a+");
-    for (int i = 0; i < 9; ++i) {
-        fprintf(file, "%c",layer_name[i]);
-    }
-    fprintf(file, "\n");
-    for (int i = 0; i < batch_size; ++i) {
-        for (int j = 0; j < output_width; ++j) {
-            for (int k = 0; k < out_channels; ++k) {
-//                printf("%d\t ", out_feature[i][0][j][k]);
-                fprintf(file, "%d\t", out_feature[i][0][j][k]);
-            }
-//            printf("\n");
-            fprintf(file, "\n");
-//    block_print(QConv_BN_5_params.batch_size,QConv_BN_5_params.output_width, QConv_BN_5_params.out_channels,QConv_BN_5_out, s4_convBN_5, z4_convBN_5);
-        }
-//        printf("\n");
-        fprintf(file, "\n");
-    }
-    fclose(file);
-}
-
-static double find_max(size_t intput_width, size_t in_channels, double input_feature[intput_width][in_channels]){
-    ////for PairNet_QDEQ_main.c
-    double maxx = -1000.0;
-    for (int j = 0; j < intput_width; ++j) {
-        for (int k = 0; k < in_channels; ++k) {
-            if (maxx < input_feature[j][k]){
-                maxx = input_feature[j][k];
-            }
-        }
-    }
-    return maxx;
-}
-static double find_min(size_t intput_width, size_t in_channels, double input_feature[intput_width][in_channels]){
-    ////for PairNet_QDEQ_main.c
-    double minn = 1000.0;
-    for (int j = 0; j < intput_width; ++j) {
-        for (int k = 0; k < in_channels; ++k) {
-            if (minn > input_feature[j][k]){
-                minn = input_feature[j][k];
-            }
-        }
-    }
-    return minn;
-}
-
 static void dequantizer(size_t output_width, size_t out_channels, elem_t output_feature[output_width][out_channels],
                         double quantize_scale, double down_scalar, double dequantized_feature[output_width][out_channels]){
     ////for PairNet_QDEQ_main.c
@@ -514,8 +316,22 @@ static double quantizer(size_t I, size_t K, size_t J , double input_feature[I][K
 
     /* Quantize input_feature in linear way*/
     //quantize feature
-    double fp_max = find_max(I, K, input_feature);
-    double fp_min = find_min(I, K, input_feature);
+    double fp_max = -1000.0;
+    for (int j = 0; j < I; ++j) {
+        for (int k = 0; k < K; ++k) {
+            if (fp_max < input_feature[j][k]){
+                fp_max = input_feature[j][k];
+            }
+        }
+    }
+    double fp_min = 1000.0;
+    for (int j = 0; j < I; ++j) {
+        for (int k = 0; k < K; ++k) {
+            if (fp_min > input_feature[j][k]){
+                fp_min = input_feature[j][k];
+            }
+        }
+    }
     double abs_max = fp_max, abs_min = fp_min;
     if (abs_min < 0) {
         abs_min = 0.0 - abs_min;
@@ -627,14 +443,14 @@ static void QMatmul(size_t I, size_t K, size_t J, const elem_t matrixA[I][K],con
     }
 }
 
-static void QDense_Gemmini(int I, int K, int J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[I][J],
-                   elem_t matrixC[I][J], double downScalar){
-    /**Gemmini**/
-    enum tiled_matmul_type_t tiled_matmul_type = WS;
-    tiled_matmul_auto(I, J, K, (elem_t*)matrixA, (elem_t*)matrixB,(acc_t*)bias, (elem_t*)matrixC,
-                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,
-                      (float )downScalar,0,false,false,false,false,false,3,tiled_matmul_type);
-
+//static void QDense_Gemmini(int I, int K, int J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[I][J],
+//                   elem_t matrixC[I][J], double downScalar) {
+//    /**Gemmini**/
+//    enum tiled_matmul_type_t tiled_matmul_type = WS;
+//    tiled_matmul_auto(I, J, K, (elem_t *) matrixA, (elem_t *) matrixB, (acc_t *) bias, (elem_t *) matrixC,
+//                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, NO_ACTIVATION,
+//                      (float) downScalar, 0, false, false, false, false, false, 3, tiled_matmul_type);
+//}
 static void QDense_cpu(int I, int K, int J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[I][J],
                    elem_t matrixC[I][J], double downScalar){
     /**CPU**/
@@ -717,46 +533,28 @@ static void conv1d_TF(const double *in_feature, size_t input_batch_size, size_t 
     }
 };
 
-static void conv1d_original(size_t batch_size, size_t in_channels,size_t input_width,elem_t feature[batch_size][in_channels][input_width],
-                            size_t kernel_group, size_t kernel_width,size_t kernel_size,elem_t kernel[kernel_group][kernel_width][kernel_size],
-                            int stride_size,size_t output_width,elem_t result[output_width][kernel_group]){
-    /**The stride version conv1d**/
-    if (kernel_width != in_channels){
-        printf("Error Exists.\n");
-    }
-    elem_t padding_feature[batch_size][in_channels][input_width + (kernel_size -1)];
-    for (int i = 0; i < batch_size; ++i) {
-        for (int j = 0; j < in_channels; ++j) {
-            for (int k = 0; k < (input_width + (kernel_size -1)); ++k) {
-                if (k >= input_width){
-                    padding_feature[i][j][k] = 0;
-                }else{
-                    padding_feature[i][j][k] = feature[i][j][k];
-                }
-                //printf("%d ",padding_feature[i][j][k]);
-            }
-            //printf("\n");
-        }
-    }
-    for (int batch = 0; batch < batch_size; ++batch) {
+static void conv1d_original(int batch_size,int input_width,int in_channels,const elem_t feature[batch_size][input_width][in_channels],
+                            int kernel_size,int out_channels,int stride_size,const elem_t kernel[kernel_size][in_channels][out_channels],
+                            int padding_front, int padding_back,int output_width,const acc_t bias[batch_size][output_width][out_channels],
+                            double downScalar, elem_t Z3, elem_t Z4,elem_t result[batch_size][output_width][out_channels]){
+    for(int b = 0; b < batch_size; b++){
         int col = 0;
-        for (int group = 0; group < kernel_group; ++group) {
+        for(int out = 0; out < out_channels; out++){
             int row = 0;
-            for (int i = 0; i < (input_width + (kernel_size -1)); i+=stride_size) {
-                if (i + stride_size > (input_width + (kernel_size -1) -1)){
-                    break;
-                }
+            for(int i = 0; i < input_width; i+=stride_size){
                 int sum = 0;
-                for (int j = 0; j < in_channels; ++j) { //0 1 2
-                    for (int k = 0; k < kernel_size; ++k) { // 0 1
-                        sum += padding_feature[batch][j][i+k] * kernel[group][j][k];
-                        //printf("%d += %d * %d\n", sum,feature[batch][j][i+k], kernel[group][j][k]);
+                for(int j = 0; j < in_channels; j++){
+                    for (int k = 0; k < kernel_size; ++k) {
+//                        printf("%d * %d\n", feature[b][i+k][j], kernel[k][j][out]);
+                        sum += feature[b][i+k][j] * kernel[k][j][out];
                     }
                 }
-                result[row][col] = (elem_t)sum;
-                row += 1;
+                result[b][row][col] = QRelu_Clip(round_near_even((sum+bias[b][row][col])*downScalar),Z3, Z4, true);
+//                printf("\n%d\n", result[b][row][col]);
+                row++;
             }
-            col += 1;
+//            printf("\n");
+            col++;
         }
     }
 }
@@ -1218,7 +1016,7 @@ static void post_processing(int batch_size, int gesN, elem_t result_matrix[batch
      * step2: find appear time from the result of step1.
      * **/
     int step1_ans[K];
-    int pre_max = 1000;
+    int pre_max = INT_MAX;
     for (int i = 0; i < K; ++i) {
         int max = -1;
         int label = -1;
@@ -1240,7 +1038,7 @@ static void post_processing(int batch_size, int gesN, elem_t result_matrix[batch
     int step2_ans[K];
     int pre_min = 0;
     for (int i = 0; i < K; ++i) {
-        int min_time = 100;
+        int min_time = INT_MAX;
         int label = -1;
         for (int j = 0; j < K; ++j) {
             if (min_time > hash_time[step1_ans[j]] && hash_time[step1_ans[j]] > pre_min){

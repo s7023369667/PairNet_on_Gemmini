@@ -12,34 +12,26 @@ add_executable(PairNet_QDEQ
         pbPlots/pbPlots.c
         pbPlots/supportLib.c
         pbPlots/supportLib.h
-)
+        )
 add_executable(PairNet_ALLQ
         src/post_processing_plot.c
         include/func.h
-        include/Qgesture_signals.h
         pbPlots/pbPlots.h
         pbPlots/pbPlots.c
         pbPlots/supportLib.c
         pbPlots/supportLib.h
-        src/pairNet_ALLQ_main.c include/gemmini_custom.h)
+        src/pairNet_ALLQ_main.c
+        include/gemmini_custom.h include/library.h)
 
 
 add_executable(PairNet_mc2conv1d
         src/post_processing_plot.c
         src/mc2_conv1d_main.c
-        include/Qgesture_signals.h
         pbPlots/pbPlots.h
         pbPlots/pbPlots.c
         pbPlots/supportLib.c
         pbPlots/supportLib.h include/gemmini_custom.h)
-add_executable(
-        pbPlots_example
-        pbPlots/example4.c
-        pbPlots/pbPlots.h
-        pbPlots/pbPlots.c
-        pbPlots/supportLib.c
-        pbPlots/supportLib.h
-        )
+
 
 target_link_libraries(PairNet_QDEQ m)
 target_include_directories(PairNet_QDEQ PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/pbPlots)
@@ -52,5 +44,5 @@ target_link_libraries(PairNet_mc2conv1d m)
 target_include_directories(PairNet_mc2conv1d PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/pbPlots)
 target_include_directories(PairNet_mc2conv1d PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries(pbPlots_example m)
+
 include_directories("/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests")

@@ -127,7 +127,7 @@ def train():
     Model_Name_Now_Time = time.strftime("%Y%m%d", time.localtime())
     window_size = 50
     gesN = 12
-    channel = 32
+    channel = 96
     Model_HDF5_name = f'./model/pairnet_model{channel}_{gesN}_{Model_Name_Now_Time}.h5'
 
     training_path = '../OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)'
@@ -140,7 +140,7 @@ def train():
     model.summary()
     lr = ReduceLROnPlateau(patience=5, factor=0.4, min_delta=0.0001, min_lr=0.00001, verbose=1)
     c = ModelCheckpoint(Model_HDF5_name, monitor='val_accuracy', verbose=0, save_best_only=True, period=1)
-    model.fit(x_train, y_train, batch_size=32, epochs=150, validation_data=(x_val, y_val), callbacks=[c, lr], verbose=2)
+    model.fit(x_train, y_train, batch_size=32, epochs=100, validation_data=(x_val, y_val), callbacks=[c, lr], verbose=2)
     K.clear_session()
 
 
