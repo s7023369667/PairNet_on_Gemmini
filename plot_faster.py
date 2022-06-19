@@ -376,8 +376,7 @@ def genesys2_8x8_L2_1window():
     plt.savefig('8x8 Without L2 Cache 1 window.png')
     plt.close()
 
-
-def layerByLayer(cvsPath: str):
+def layerByLayer_matmul_single(cvsPath: str):
     cvs = pd.read_csv(cvsPath)
     df = pd.DataFrame(cvs)
     df = df.set_index('Models')
@@ -446,18 +445,285 @@ def layerByLayer(cvsPath: str):
 
     plt.plot(matmul_16, '-o')
     plt.plot(matmul_32, '-v')
-    plt.plot(matmul_48, '-s')
+    plt.plot(matmul_48, '-v')
     plt.plot(matmul_56, '-D')
     plt.plot(matmul_64, '-X')
-    plt.plot(matmul_88, '-8')
-    plt.plot(matmul_128, '-*')
+    # plt.plot(matmul_72, '-8')
+    # plt.plot(matmul_80, '-*')
+    # plt.plot(matmul_88, '-*')
+    # plt.plot(matmul_96, '-*')
+    # plt.plot(matmul_128, '-*')
     plt.xticks(np.arange(5), ['1', '2', '3', '4', '5'])
     plt.xlabel("Model Layer")
     plt.ylabel("Times faster than CPU")
-    plt.legend(['Model channel 16', 'Model channel 32', 'Model channel 48', 'Model channel 56', 'Model channel 64',
-                'Model channel 88', 'Model channel 128'])
-    plt.title("8x8 CPU Matmul V.S Gemmini Matmul Layer by Layer")
-    plt.savefig('8x8 CPU Matmul V.S Gemmini Matmul Layer by Layer.png')
+    plt.legend(['Model channel 16',
+                'Model channel 32',
+                'Model channel 48',
+                'Model channel 56',
+                'Model channel 64'])
+    plt.title("Single Windows 8x8 CPU Matmul V.S Gemmini Matmul Layer by Layer")
+    plt.savefig('Single Windows 8x8 CPU Matmul V.S Gemmini Matmul Layer by Layer.png')
+    plt.show()
+
+
+
+def layerByLayer_matmul(cvsPath: str):
+    cvs = pd.read_csv(cvsPath)
+    df = pd.DataFrame(cvs)
+    df = df.set_index('Models')
+    print(df)
+
+    matmulFirst = [df['Layer1']['CPU_matmul_16'] / df['Layer1']['Gemmini_matmul_16'],
+                   df['Layer1']['CPU_matmul_32'] / df['Layer1']['Gemmini_matmul_32'],
+                   df['Layer1']['CPU_matmul_48'] / df['Layer1']['Gemmini_matmul_48'],
+                   df['Layer1']['CPU_matmul_56'] / df['Layer1']['Gemmini_matmul_56'],
+                   df['Layer1']['CPU_matmul_64'] / df['Layer1']['Gemmini_matmul_64'],
+                   df['Layer1']['CPU_matmul_72'] / df['Layer1']['Gemmini_matmul_72'],
+                   df['Layer1']['CPU_matmul_80'] / df['Layer1']['Gemmini_matmul_80'],
+                   df['Layer1']['CPU_matmul_88'] / df['Layer1']['Gemmini_matmul_88'],
+                   df['Layer1']['CPU_matmul_96'] / df['Layer1']['Gemmini_matmul_96'],
+                   df['Layer1']['CPU_matmul_128'] / df['Layer1']['Gemmini_matmul_128']]
+    matmulSecond = [df['Layer2']['CPU_matmul_16'] / df['Layer2']['Gemmini_matmul_16'],
+                    df['Layer2']['CPU_matmul_32'] / df['Layer2']['Gemmini_matmul_32'],
+                    df['Layer2']['CPU_matmul_48'] / df['Layer2']['Gemmini_matmul_48'],
+                    df['Layer2']['CPU_matmul_56'] / df['Layer2']['Gemmini_matmul_56'],
+                    df['Layer2']['CPU_matmul_64'] / df['Layer2']['Gemmini_matmul_64'],
+                    df['Layer2']['CPU_matmul_72'] / df['Layer2']['Gemmini_matmul_72'],
+                    df['Layer2']['CPU_matmul_80'] / df['Layer2']['Gemmini_matmul_80'],
+                    df['Layer2']['CPU_matmul_88'] / df['Layer2']['Gemmini_matmul_88'],
+                    df['Layer2']['CPU_matmul_96'] / df['Layer2']['Gemmini_matmul_96'],
+                    df['Layer2']['CPU_matmul_128'] / df['Layer2']['Gemmini_matmul_128']]
+    matmulThird = [df['Layer3']['CPU_matmul_16'] / df['Layer3']['Gemmini_matmul_16'],
+                   df['Layer3']['CPU_matmul_32'] / df['Layer3']['Gemmini_matmul_32'],
+                   df['Layer3']['CPU_matmul_48'] / df['Layer3']['Gemmini_matmul_48'],
+                   df['Layer3']['CPU_matmul_56'] / df['Layer3']['Gemmini_matmul_56'],
+                   df['Layer3']['CPU_matmul_64'] / df['Layer3']['Gemmini_matmul_64'],
+                   df['Layer3']['CPU_matmul_72'] / df['Layer3']['Gemmini_matmul_72'],
+                   df['Layer3']['CPU_matmul_80'] / df['Layer3']['Gemmini_matmul_80'],
+                   df['Layer3']['CPU_matmul_88'] / df['Layer3']['Gemmini_matmul_88'],
+                   df['Layer3']['CPU_matmul_96'] / df['Layer3']['Gemmini_matmul_96'],
+                   df['Layer3']['CPU_matmul_128'] / df['Layer3']['Gemmini_matmul_128']]
+    matmulForth = [df['Layer4']['CPU_matmul_16'] / df['Layer4']['Gemmini_matmul_16'],
+                   df['Layer4']['CPU_matmul_32'] / df['Layer4']['Gemmini_matmul_32'],
+                   df['Layer4']['CPU_matmul_48'] / df['Layer4']['Gemmini_matmul_48'],
+                   df['Layer4']['CPU_matmul_56'] / df['Layer4']['Gemmini_matmul_56'],
+                   df['Layer4']['CPU_matmul_64'] / df['Layer4']['Gemmini_matmul_64'],
+                   df['Layer4']['CPU_matmul_72'] / df['Layer4']['Gemmini_matmul_72'],
+                   df['Layer4']['CPU_matmul_80'] / df['Layer4']['Gemmini_matmul_80'],
+                   df['Layer4']['CPU_matmul_88'] / df['Layer4']['Gemmini_matmul_88'],
+                   df['Layer4']['CPU_matmul_96'] / df['Layer4']['Gemmini_matmul_96'],
+                   df['Layer4']['CPU_matmul_128'] / df['Layer4']['Gemmini_matmul_128']]
+    matmulFifth = [df['Layer5']['CPU_matmul_16'] / df['Layer5']['Gemmini_matmul_16'],
+                   df['Layer5']['CPU_matmul_32'] / df['Layer5']['Gemmini_matmul_32'],
+                   df['Layer5']['CPU_matmul_48'] / df['Layer5']['Gemmini_matmul_48'],
+                   df['Layer5']['CPU_matmul_56'] / df['Layer5']['Gemmini_matmul_56'],
+                   df['Layer5']['CPU_matmul_64'] / df['Layer5']['Gemmini_matmul_64'],
+                   df['Layer5']['CPU_matmul_72'] / df['Layer5']['Gemmini_matmul_72'],
+                   df['Layer5']['CPU_matmul_80'] / df['Layer5']['Gemmini_matmul_80'],
+                   df['Layer5']['CPU_matmul_88'] / df['Layer5']['Gemmini_matmul_88'],
+                   df['Layer5']['CPU_matmul_96'] / df['Layer5']['Gemmini_matmul_96'],
+                   df['Layer5']['CPU_matmul_128'] / df['Layer5']['Gemmini_matmul_128']]
+    matmul_16 = [matmulFirst[0], matmulSecond[0], matmulThird[0], matmulForth[0], matmulFifth[0]]
+    matmul_32 = [matmulFirst[1], matmulSecond[1], matmulThird[1], matmulForth[1], matmulFifth[1]]
+    matmul_48 = [matmulFirst[2], matmulSecond[2], matmulThird[2], matmulForth[2], matmulFifth[2]]
+    matmul_56 = [matmulFirst[3], matmulSecond[3], matmulThird[3], matmulForth[3], matmulFifth[3]]
+    matmul_64 = [matmulFirst[4], matmulSecond[4], matmulThird[4], matmulForth[4], matmulFifth[4]]
+    matmul_72 = [matmulFirst[5], matmulSecond[5], matmulThird[5], matmulForth[5], matmulFifth[5]]
+    matmul_80 = [matmulFirst[6], matmulSecond[6], matmulThird[6], matmulForth[6], matmulFifth[6]]
+    matmul_88 = [matmulFirst[7], matmulSecond[7], matmulThird[7], matmulForth[7], matmulFifth[7]]
+    matmul_96 = [matmulFirst[8], matmulSecond[8], matmulThird[8], matmulForth[8], matmulFifth[8]]
+    matmul_128 = [matmulFirst[9], matmulSecond[9], matmulThird[9], matmulForth[9], matmulFifth[9]]
+
+    plt.plot(matmul_16, '-o')
+    plt.plot(matmul_32, '-v')
+    plt.plot(matmul_48, '-v')
+    plt.plot(matmul_56, '-D')
+    plt.plot(matmul_64, '-X')
+    # plt.plot(matmul_72, '-8')
+    # plt.plot(matmul_80, '-*')
+    # plt.plot(matmul_88, '-*')
+    # plt.plot(matmul_96, '-*')
+    # plt.plot(matmul_128, '-*')
+    plt.xticks(np.arange(5), ['1', '2', '3', '4', '5'])
+    plt.xlabel("Model Layer")
+    plt.ylabel("Times faster than CPU")
+    plt.legend(['Model channel 16',
+                'Model channel 32',
+                'Model channel 48',
+                'Model channel 56',
+                'Model channel 64'])
+    plt.title("ALL Windows 8x8 CPU Matmul V.S Gemmini Matmul Layer by Layer")
+    plt.savefig('ALL Windows 8x8 CPU Matmul V.S Gemmini Matmul Layer by Layer.png')
+    plt.show()
+
+
+def layerByLayer_conv1d(cvsPath: str):
+    cvs = pd.read_csv(cvsPath)
+    df = pd.DataFrame(cvs)
+    df = df.set_index('Models')
+    print(df)
+
+    convFirst = [df['Layer1']['CPU_matmul_16'] / df['Layer1']['gemmini_conv_16'],
+                   df['Layer1']['CPU_matmul_32'] / df['Layer1']['gemmini_conv_32'],
+                   df['Layer1']['CPU_matmul_48'] / df['Layer1']['gemmini_conv_48'],
+                   df['Layer1']['CPU_matmul_56'] / df['Layer1']['gemmini_conv_56'],
+                   df['Layer1']['CPU_matmul_64'] / df['Layer1']['gemmini_conv_64'],
+                   df['Layer1']['CPU_matmul_72'] / df['Layer1']['gemmini_conv_72'],
+                   df['Layer1']['CPU_matmul_80'] / df['Layer1']['gemmini_conv_80']]
+    convSecond = [df['Layer2']['CPU_matmul_16'] / df['Layer2']['gemmini_conv_16'],
+                    df['Layer2']['CPU_matmul_32'] / df['Layer2']['gemmini_conv_32'],
+                    df['Layer2']['CPU_matmul_48'] / df['Layer2']['gemmini_conv_48'],
+                    df['Layer2']['CPU_matmul_56'] / df['Layer2']['gemmini_conv_56'],
+                    df['Layer2']['CPU_matmul_64'] / df['Layer2']['gemmini_conv_64'],
+                    df['Layer2']['CPU_matmul_72'] / df['Layer2']['gemmini_conv_72'],
+                    df['Layer2']['CPU_matmul_80'] / df['Layer2']['gemmini_conv_80']]
+    convThird = [df['Layer3']['CPU_matmul_16'] / df['Layer3']['gemmini_conv_16'],
+                   df['Layer3']['CPU_matmul_32'] / df['Layer3']['gemmini_conv_32'],
+                   df['Layer3']['CPU_matmul_48'] / df['Layer3']['gemmini_conv_48'],
+                   df['Layer3']['CPU_matmul_56'] / df['Layer3']['gemmini_conv_56'],
+                   df['Layer3']['CPU_matmul_64'] / df['Layer3']['gemmini_conv_64'],
+                   df['Layer3']['CPU_matmul_72'] / df['Layer3']['gemmini_conv_72'],
+                   df['Layer3']['CPU_matmul_80'] / df['Layer3']['gemmini_conv_80']]
+    convForth = [df['Layer4']['CPU_matmul_16'] / df['Layer4']['gemmini_conv_16'],
+                   df['Layer4']['CPU_matmul_32'] / df['Layer4']['gemmini_conv_32'],
+                   df['Layer4']['CPU_matmul_48'] / df['Layer4']['gemmini_conv_48'],
+                   df['Layer4']['CPU_matmul_56'] / df['Layer4']['gemmini_conv_56'],
+                   df['Layer4']['CPU_matmul_64'] / df['Layer4']['gemmini_conv_64'],
+                   df['Layer4']['CPU_matmul_72'] / df['Layer4']['gemmini_conv_72'],
+                   df['Layer4']['CPU_matmul_80'] / df['Layer4']['gemmini_conv_80']]
+    convFifth = [df['Layer5']['CPU_matmul_16'] / df['Layer5']['gemmini_conv_16'],
+                   df['Layer5']['CPU_matmul_32'] / df['Layer5']['gemmini_conv_32'],
+                   df['Layer5']['CPU_matmul_48'] / df['Layer5']['gemmini_conv_48'],
+                   df['Layer5']['CPU_matmul_56'] / df['Layer5']['gemmini_conv_56'],
+                   df['Layer5']['CPU_matmul_64'] / df['Layer5']['gemmini_conv_64'],
+                   df['Layer5']['CPU_matmul_72'] / df['Layer5']['gemmini_conv_72'],
+                   df['Layer5']['CPU_matmul_80'] / df['Layer5']['gemmini_conv_80']]
+    conv_16 = [convFirst[0], convSecond[0], convThird[0], convForth[0], convFifth[0]]
+    conv_32 = [convFirst[1], convSecond[1], convThird[1], convForth[1], convFifth[1]]
+    conv_48 = [convFirst[2], convSecond[2], convThird[2], convForth[2], convFifth[2]]
+    conv_56 = [convFirst[3], convSecond[3], convThird[3], convForth[3], convFifth[3]]
+    conv_64 = [convFirst[4], convSecond[4], convThird[4], convForth[4], convFifth[4]]
+    copnv_72 = [convFirst[5], convSecond[5], convThird[5], convForth[5], convFifth[5]]
+    conv_80 = [convFirst[6], convSecond[6], convThird[6], convForth[6], convFifth[6]]
+    # matmul_88 = [matmulFirst[7], matmulSecond[7], matmulThird[7], matmulForth[7], matmulFifth[7]]
+    # matmul_96 = [matmulFirst[8], matmulSecond[8], matmulThird[8], matmulForth[8], matmulFifth[8]]
+    # matmul_128 = [matmulFirst[9], matmulSecond[9], matmulThird[9], matmulForth[9], matmulFifth[9]]
+
+    plt.plot(conv_16, '-o')
+    plt.plot(conv_32, '-v')
+    plt.plot(conv_48, '-v')
+    plt.plot(conv_56, '-D')
+    plt.plot(conv_64, '-X')
+    # plt.plot(copnv_72, '-8')
+    # plt.plot(conv_80, '-*')
+    # plt.plot(matmul_88, '-*')
+    # plt.plot(matmul_96, '-*')
+    # plt.plot(matmul_128, '-*')
+    plt.xticks(np.arange(5), ['1', '2', '3', '4', '5'])
+    plt.xlabel("Model Layer")
+    plt.ylabel("Times faster than CPU")
+    plt.legend(['Model channel 16',
+                'Model channel 32',
+                'Model channel 48',
+                'Model channel 56',
+                'Model channel 64'])
+    plt.title("All windows 8x8 CPU Matmul V.S Gemmini Conv1d Layer by Layer")
+    plt.savefig('All windows 8x8 CPU Matmul V.S Gemmini Conv1d Layer by Layer.png')
+    plt.show()
+
+
+def layerByLayer_vs(cvsPath: str):
+    cvs = pd.read_csv(cvsPath)
+    df = pd.DataFrame(cvs)
+    df = df.set_index('Models')
+    print(df)
+
+    convFirst = [df['Layer1']['CPU_matmul_16'] / df['Layer1']['gemmini_conv_16'],
+                 df['Layer1']['CPU_matmul_32'] / df['Layer1']['gemmini_conv_32'],
+                 df['Layer1']['CPU_matmul_48'] / df['Layer1']['gemmini_conv_48'],
+                 df['Layer1']['CPU_matmul_56'] / df['Layer1']['gemmini_conv_56'],
+                 df['Layer1']['CPU_matmul_64'] / df['Layer1']['gemmini_conv_64'],
+                 df['Layer1']['CPU_matmul_72'] / df['Layer1']['gemmini_conv_72'],
+                 df['Layer1']['CPU_matmul_80'] / df['Layer1']['gemmini_conv_80']]
+    convSecond = [df['Layer2']['CPU_matmul_16'] / df['Layer2']['gemmini_conv_16'],
+                  df['Layer2']['CPU_matmul_32'] / df['Layer2']['gemmini_conv_32'],
+                  df['Layer2']['CPU_matmul_48'] / df['Layer2']['gemmini_conv_48'],
+                  df['Layer2']['CPU_matmul_56'] / df['Layer2']['gemmini_conv_56'],
+                  df['Layer2']['CPU_matmul_64'] / df['Layer2']['gemmini_conv_64'],
+                  df['Layer2']['CPU_matmul_72'] / df['Layer2']['gemmini_conv_72'],
+                  df['Layer2']['CPU_matmul_80'] / df['Layer2']['gemmini_conv_80']]
+    convThird = [df['Layer3']['CPU_matmul_16'] / df['Layer3']['gemmini_conv_16'],
+                 df['Layer3']['CPU_matmul_32'] / df['Layer3']['gemmini_conv_32'],
+                 df['Layer3']['CPU_matmul_48'] / df['Layer3']['gemmini_conv_48'],
+                 df['Layer3']['CPU_matmul_56'] / df['Layer3']['gemmini_conv_56'],
+                 df['Layer3']['CPU_matmul_64'] / df['Layer3']['gemmini_conv_64'],
+                 df['Layer3']['CPU_matmul_72'] / df['Layer3']['gemmini_conv_72'],
+                 df['Layer3']['CPU_matmul_80'] / df['Layer3']['gemmini_conv_80']]
+    convForth = [df['Layer4']['CPU_matmul_16'] / df['Layer4']['gemmini_conv_16'],
+                 df['Layer4']['CPU_matmul_32'] / df['Layer4']['gemmini_conv_32'],
+                 df['Layer4']['CPU_matmul_48'] / df['Layer4']['gemmini_conv_48'],
+                 df['Layer4']['CPU_matmul_56'] / df['Layer4']['gemmini_conv_56'],
+                 df['Layer4']['CPU_matmul_64'] / df['Layer4']['gemmini_conv_64'],
+                 df['Layer4']['CPU_matmul_72'] / df['Layer4']['gemmini_conv_72'],
+                 df['Layer4']['CPU_matmul_80'] / df['Layer4']['gemmini_conv_80']]
+    convFifth = [df['Layer5']['CPU_matmul_16'] / df['Layer5']['gemmini_conv_16'],
+                 df['Layer5']['CPU_matmul_32'] / df['Layer5']['gemmini_conv_32'],
+                 df['Layer5']['CPU_matmul_48'] / df['Layer5']['gemmini_conv_48'],
+                 df['Layer5']['CPU_matmul_56'] / df['Layer5']['gemmini_conv_56'],
+                 df['Layer5']['CPU_matmul_64'] / df['Layer5']['gemmini_conv_64'],
+                 df['Layer5']['CPU_matmul_72'] / df['Layer5']['gemmini_conv_72'],
+                 df['Layer5']['CPU_matmul_80'] / df['Layer5']['gemmini_conv_80']]
+    conv_16 = [convFirst[0], convSecond[0], convThird[0], convForth[0], convFifth[0]]
+    conv_32 = [convFirst[1], convSecond[1], convThird[1], convForth[1], convFifth[1]]
+    conv_48 = [convFirst[2], convSecond[2], convThird[2], convForth[2], convFifth[2]]
+    conv_56 = [convFirst[3], convSecond[3], convThird[3], convForth[3], convFifth[3]]
+    conv_64 = [convFirst[4], convSecond[4], convThird[4], convForth[4], convFifth[4]]
+    copnv_72 = [convFirst[5], convSecond[5], convThird[5], convForth[5], convFifth[5]]
+    conv_80 = [convFirst[6], convSecond[6], convThird[6], convForth[6], convFifth[6]]
+    # matmul_88 = [matmulFirst[7], matmulSecond[7], matmulThird[7], matmulForth[7], matmulFifth[7]]
+    # matmul_96 = [matmulFirst[8], matmulSecond[8], matmulThird[8], matmulForth[8], matmulFifth[8]]
+    # matmul_128 = [matmulFirst[9], matmulSecond[9], matmulThird[9], matmulForth[9], matmulFifth[9]]
+
+    plt.plot(conv_16, '-o')
+    plt.plot(conv_32, '-v')
+    plt.plot(conv_48, '-v')
+    plt.plot(conv_56, '-D')
+    plt.plot(conv_64, '-X')
+    # plt.plot(copnv_72, '-8')
+    # plt.plot(conv_80, '-*')
+    # plt.plot(matmul_88, '-*')
+    # plt.plot(matmul_96, '-*')
+    # plt.plot(matmul_128, '-*')
+    plt.xticks(np.arange(5), ['1', '2', '3', '4', '5'])
+    plt.xlabel("Model Layer")
+    plt.ylabel("Times faster than CPU")
+    plt.legend(['Model channel 16',
+                'Model channel 32',
+                'Model channel 48',
+                'Model channel 56',
+                'Model channel 64'])
+    plt.title("All windows 8x8 CPU Matmul V.S Gemmini Conv1d Layer by Layer")
+    plt.savefig('All windows 8x8 CPU Matmul V.S Gemmini Conv1d Layer by Layer.png')
+    plt.show()
+
+def data_lbl():
+    def addText(x, y):
+        for i in range(len(x)):
+            plt.text(x[i]-0.15, y[i], y[i])
+    # # # parameters:
+    m16 = np.array([13824, 12288, 12288, 12288, 12288])
+    m32 = np.array([27648, 49152, 24576, 24576, 24576])
+    m64 = np.array([55296, 196608, 98304, 98304, 98304])
+    plt.figure(figsize=(12, 12))
+    bar1 = plt.bar(np.arange(len(m16)), m16, width=0.2, lw=1, edgecolor='white', alpha=0.8)
+    addText(np.arange(len(m16)), m16)
+    bar2 = plt.bar(np.arange(len(m32))+0.25, m32, width=0.2, lw=1, edgecolor='white', alpha=0.8)
+    addText(np.arange(len(m32))+0.25, m32)
+    bar3 = plt.bar(np.arange(len(m64))+0.5, m64, width=0.2, lw=1, edgecolor='white', alpha=0.8)
+    addText(np.arange(len(m64))+0.5, m64)
+    plt.yticks(color='w')
+    plt.xticks(np.arange(len(m16)), ['Layer1', 'Layer2', 'Layer3', 'Layer4', 'Layer5'])
+    plt.legend((bar1, bar2, bar3), ('NN1', 'NN2', 'NN3'))
     plt.show()
 
 
@@ -471,4 +737,7 @@ if __name__ == '__main__':
     # genesys2_8x8_L2_1window()
     # genesys2_8x8_noL2_1window()
     # genesys2_4x4()
-    layerByLayer('./layerBylayer_allwindows.csv')
+    # layerByLayer_matmul('./layerBylayer_allwindows.csv')
+    # layerByLayer_matmul_single('./LBL_oneWindow.csv')
+    # layerByLayer_conv1d('./layerBylayer_allwindows.csv')
+    data_lbl()

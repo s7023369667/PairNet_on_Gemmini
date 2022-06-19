@@ -3,130 +3,12 @@ from tensorflow.keras.models import load_model
 import numpy as np
 from library import *
 import shutil
-from gesture_signals import make_Qsiginals
 from Qconv1d import reshape_kernel, reshape_feature, pre_compute_bias, Qconv1d
-
-
-def make_pairNetQDEQ_params(batch_size, input_width, stride_size, gesN, header_name='./include/pairnet_params.h'):
-    """feed into PairNet_QDEQ_main.c"""
-    f = open(header_name, "w+")
-    f.write(f"//{datetime.datetime.now()}\n")
-    f.write("#ifndef PAIR_NET_PARAMS_H\n")
-    f.write("#define PAIR_NET_PARAMS_H\n\n")
-    f.write("#include <stdint.h>\n")
-    f.write("#include <stdbool.h>\n\n")
-    f.write("struct Conv1d_Params {\n\tint batch_size;\n\tint input_width;\n\tint in_channels;\n\t"
-            "int out_channels;\n\tint kernel_size;\n\tint stride_size;\n\t""int padding_front;\n\t"
-            "int padding_back;\n\tint output_width;\n\tdouble out_scale;\n\t};\n")
-    model_pairNet = load_model("PairNet/model/model_PairNet_paper.h5")
-    for layer in model_pairNet.layers:
-        print(layer.name)
-        print(np.array(layer.get_weights()).shape)
-        # print(layer.get_weights())
-        shape = ''
-        for i in range(len(np.array(layer.get_weights()).shape)):
-            shape += f"[{np.array(layer.get_weights()).shape[i]}]"
-        if layer.get_weights():
-            if 'batch_normalization' in layer.name:
-                f.write(f" static const double {layer.name}{shape} = \n")
-                row = np.array(layer.get_weights()).shape[0]
-                col = np.array(layer.get_weights()).shape[1]
-                f.write('{')
-                for i in range(row):
-                    f.write('{')
-                    for j in range(col):
-                        if j != (col - 1):
-                            f.write(f"{layer.get_weights()[i][j]},")
-                        else:
-                            f.write(f"{layer.get_weights()[i][j]}")
-                    if i != (row - 1):
-                        f.write('},')
-                    else:
-                        f.write('}')
-                f.write('};\n')
-            elif 'conv1d' in layer.name:
-                wrapper = np.array(layer.get_weights()).shape[0]
-                filters = np.array(layer.get_weights()).shape[1]
-                in_channels = np.array(layer.get_weights()).shape[2]
-                out_channels = np.array(layer.get_weights()).shape[3]
-                kernel_size = filters
-                do_padding = False
-                padding_front, padding_back, padding_size = 0, 0, 0
-                if do_padding:
-                    padding_back = 1
-                    if kernel_size % 2 != 0:
-                        padding_front = 1
-                    else:
-                        padding_front = 0
-                padding_size = padding_back + padding_front
-                output_width = (input_width - kernel_size + padding_size) // stride_size + 1
-                f.write(f" static const double {layer.name}{shape} = \n")
-                f.write('{')
-                for i in range(wrapper):
-                    f.write('{')
-                    for j in range(filters):
-                        f.write('{')
-                        for k in range(in_channels):
-                            f.write('{')
-                            for l in range(out_channels):
-                                if l != (out_channels - 1):
-                                    f.write(f"{layer.get_weights()[i][j][k][l]},")
-                                else:
-                                    f.write(f"{layer.get_weights()[i][j][k][l]}")
-                            if k != (in_channels - 1):
-                                f.write('},')
-                            else:
-                                f.write('}')
-                        if j != (filters - 1):
-                            f.write('},')
-                        else:
-                            f.write('}')
-                    f.write('}')
-                f.write('};\n')
-                f.write(f' static const struct Conv1d_Params {layer.name}_params = {{'
-                        f'.batch_size = {batch_size}, .input_width={input_width}, .in_channels={in_channels},'
-                        f' .out_channels = {out_channels},.kernel_size ={kernel_size},.stride_size={stride_size},'
-                        f'.padding_front= {padding_front},.padding_back= {padding_back},.output_width={output_width}}};\n')
-                f.write(f'static double {layer.name}_out[{batch_size}][1][{output_width}][{out_channels}];\n')
-                input_width = output_width
-                stride_size = 2
-            elif 'dense' in layer.name:
-                params = layer.get_weights()[0]
-                f.write(f" static const double {layer.name}_params[{len(params)}][{len(params[0])}] = \n")
-                f.write('{')
-                for i in range(len(params)):
-                    f.write('{')
-                    for j in range(len(params[i])):
-                        if not j == (len(params[i]) - 1):
-                            f.write(f'{params[i][j]},')
-                        else:
-                            f.write(f'{params[i][j]}')
-                    if not i == (len(params) - 1):
-                        f.write('}{kernel_size * in_channels},')
-                    else:
-                        f.write('}')
-                f.write('};\n')
-                bias = layer.get_weights()[1]
-                f.write(f" static const double {layer.name}_bias[{len(bias)}] = \n")
-                f.write('{')
-                for i in range(len(bias)):
-                    if not i == (len(bias) - 1):
-                        f.write(f'{bias[i]},')
-                    else:
-                        f.write(f'{bias[i]}')
-                f.write('};\n')
-                f.write(f" static double dense_out[{batch_size}][{gesN}];\n")
-
-        elif 'global_average_pooling1d' in layer.name:
-            f.write(f" static double gap_out[{batch_size}][256];\n")
-
-    f.write('#endif\n')
-    f.close()
 
 
 def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signals, path, true_label: list,
                          header_name='./include/Qpairnet_params_32.h'):
-    """feed into PairNet_ALLQ_main.c b & mc2_conv1d_main"""
+    """feed into PairNet_ALLQ_main.c  & mc2_conv1d_main"""
     f = open(header_name, "w+")
     f.write(f"//{datetime.datetime.now()}\n")
     f.write(f"#ifndef QPAIR_NET_PARAMS_H\n")
@@ -171,7 +53,10 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
                 padding_size = padding_back + padding_front
                 output_width = (input_width - kernel_size + padding_size) // stride_size + 1
                 """Folding zeroPointBN into Conv1D"""
-                convBN, convBN_bias = Folding_Conv_BN(batch_size, output_width, conv, BN)
+                convBN, bias = Folding_Conv_BN(conv, BN)
+                convBN_bias = np.repeat([bias], output_width, axis=0)
+                convBN_bias = np.repeat([convBN_bias], batch_size, axis=0)
+                convBN_bias = convBN_bias.reshape([batch_size, 1, output_width, out_channels])
                 """Quantized weights"""
                 best_minn, best_maxx = optimal_MinMax(convBN)
                 s2_convBN, z2_convBN = cal_scaleZeroPoint(r_max=best_maxx, r_min=best_minn)
@@ -350,5 +235,13 @@ def make_Qpairnet_params(batch_size, input_width, stride_size, gesN, input_signa
     # f.write(f"double deq_softmax_out[{batch_size}][{gesN}];\n")
     f.write('#endif\n')
     f.close()
-    dst = f'/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/{header_name[2:]}'
-    shutil.copyfile(header_name, dst)
+    saveDir = '/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/include/'
+    dst = saveDir + header_name.split('/')[-1]
+    shutil.move(header_name, dst)
+
+
+if __name__ == '__main__':
+    gesN = 12
+    channel = 16
+    model_path = './PairNet/model/model_QconvBN16_9.h5'
+

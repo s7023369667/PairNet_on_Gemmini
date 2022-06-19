@@ -16,7 +16,6 @@ from keras.optimizers import Adadelta
      activation - 可選擇活化函數
  '''
 
-
 def build_model(input_shape, dim, odim, channel):
     cprint(colored('Now Import Model - Pairnet'), 'magenta', 'on_grey')
     input1 = Input(shape=(input_shape, dim))
@@ -52,10 +51,10 @@ def build_model(input_shape, dim, odim, channel):
 
 
 if __name__ == '__main__':
-    gesN = 5
-    channel = 16
+    gesN = 12
+    channel = 64
+    # model_tmp = build_model(50, 6, gesN, channel)
     model_tmp = build_model(50, 6, gesN, channel)
-
     # print('total_float_ops - ', get_flops(model_tmp))
     model_tmp.summary()
 

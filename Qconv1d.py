@@ -1,5 +1,7 @@
 from library import *
-from tensorflow.keras.models import load_model
+from tensorflow.keras.models import load_model, Sequential
+from keras.models import Model
+from tensorflow.keras.layers import *
 
 
 def round_near_even(x: float):
@@ -118,12 +120,20 @@ def pre_compute_bias(input_feature: np.ndarray, kernel: np.ndarray, bias: np.nda
 
 
 if __name__ == '__main__':
-    path = 'Oap/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110149_(Wen)_H50_N3_K9-8-4.txt'
-    model_pairNet = load_model("PairNet/model/pairnet_model16_9_20220216.h5")
+    path = 'PairNet/1071109_test_1-2-3-4_New12_test/9-8-4/TD20180927-110149_(Wen)_H50_N3_K9-8-4.txt'
+    model_pairNet = load_model("PairNet/model/pairnet_model16_12_20220503.h5")
+
+    # conv1, bn1 = [], []
     for layer in model_pairNet.layers:
-        if 'cov' in layer.name:
-            weight = np.array(layer.get_weights())
-        break
-    windows = make_window_siginals(path)
-    reshape_feature = reshape_feature(windows, kernel_size=3, stride_size=1, out_width=48)
-    reshape_kernel = reshape_kernel(weight)
+        print(layer.name)
+        print(np.array(layer.get_weights(), dtype=object).shape)
+
+    #     if 'cov1d' in layer.name:
+    #         conv1 = np.array(layer.get_weights())
+    #     if 'batch_normalization' in layer.name:
+    #         bn1 = np.array(layer.get_weights())
+    #         break
+    # windows = make_window_siginals(path)
+    # test_BN_folding(windows.shape[0], 48, windows, conv1, bn1)
+    # reshape_feature = reshape_feature(windows, kernel_size=3, stride_size=1, out_width=48)
+    # reshape_kernel = reshape_kernel(weight)

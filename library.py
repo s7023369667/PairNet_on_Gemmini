@@ -16,15 +16,15 @@ def BatchNormalization(x: np.ndarray, params: np.ndarray, eps=1e-3):
     return y
 
 
-def Folding_Conv_BN(batch_size, output_width, conv1d_wieghts: np.ndarray, BN: np.ndarray, eps=1e-3):
-    """TODO : Folding BN weights into Conv1d-weights
+def Folding_Conv_BN(conv1d_wieghts: np.ndarray, BN: np.ndarray, eps=1e-3):
+    """Folding BN weights into Conv1d-weights
      *  conv1d_wieghts : (1, kernel_size, in_channel, out_channel)
      *  Y_bn = gamma * (y - moving_means)/(sqrt(moving_var + eps)) + beta
      *  r_hat = gamma / sqrt(moving_var + eps)
      *  W_hat = r_hat * W
      *  bias_hat = r_hat * (bias - moving_means) + beta
      """
-    conv1d_bias = np.zeros((batch_size, 1, output_width, conv1d_wieghts.shape[-1]))
+    conv1d_bias = np.zeros((conv1d_wieghts.shape[3],))
     gamma = BN[0].reshape((1, 1, 1, BN[0].shape[0]))
     beta = BN[1]
     mean = BN[2]
@@ -35,7 +35,7 @@ def Folding_Conv_BN(batch_size, output_width, conv1d_wieghts: np.ndarray, BN: np
 
 
 def test_BN_folding(batch_size, out_width, windows, conv_weight, bn_params):
-    weight_fold, weight_fold_bias = Folding_Conv_BN(batch_size, out_width, conv_weight, bn_params)
+    weight_fold, weight_fold_bias = Folding_Conv_BN(conv_weight, bn_params)
     res_fold = tf.nn.conv1d(windows, weight_fold[0], stride=1, padding='VALID') + weight_fold_bias
 
     res = tf.nn.conv1d(windows, conv_weight[0], stride=1, padding='VALID')
@@ -84,6 +84,21 @@ def make_window_siginals(txt_path):
     return np.array(queue)
 
 
+def make_window_siginals_opt(txt_path):
+    queue = []
+    window_size = 50
+    with open(txt_path, 'r') as f:
+        window = []
+        pairNet_samples = f.readlines()
+        label = pairNet_samples[-1].split()
+        for line in pairNet_samples[:-1]:
+            window.append(list(map(eval, line.split())))
+            if len(window) == window_size:
+                queue.append(np.array(window[:], dtype=np.float32).reshape((1, 50, 6)))
+                window.pop(0)
+    return np.array(queue), label
+
+
 def cal_scaleZeroPoint(r_max, r_min, q_max=127, q_min=-128):
     scale = (r_max - r_min) / (q_max - q_min)
     zeroPoint = q_max - (r_max / scale)
@@ -108,7 +123,6 @@ def cosineSimilarity(P: np.ndarray, Q: np.ndarray):
     norm_q = np.sum(q * q for q in Q) ** 0.5
     cos_sim = dot / ((norm_p * norm_q) + 1e-5)
     # cosine_similarity([P], [Q])
-    # print(cos_sim)
     return cos_sim
 
 
@@ -123,8 +137,6 @@ def stastics_data(x: np.ndarray, isfloat=True):
 
     indices = sorted(stastics.keys())
     counts = [stastics[k] for k in indices]
-    print(indices)
-    print(counts)
     return indices, counts
 
 
@@ -143,7 +155,7 @@ def optimal_MinMax(x: np.ndarray):
     best_cosine_sim = -1
     best_minn, best_maxx = float('inf'), float('-inf')
     means, std = np.mean(x), np.std(x)
-    region = np.arange(2, 4, 0.1)
+    region = np.arange(2, 3.1, 0.1)
     for i in range(len(region)):
         minn, maxx = means - region[i] * std, means + region[i] * std
         scale, zero_point = cal_scaleZeroPoint(r_min=minn, r_max=maxx)
@@ -154,7 +166,6 @@ def optimal_MinMax(x: np.ndarray):
             best_minn, best_maxx = minn, maxx
             best_cosine_sim = np.mean(cosine_sim)
             # print(best_cosine_sim)
-    # print(best_minn, best_maxx)
     return best_minn, best_maxx
 
 
@@ -162,4 +173,3 @@ def approximate_M(M: float):
     """M = S1 * S2 / S4 , could be approximated to a fixed-point-number(m0) with bit shift(n) """
     m0, n = math.frexp(M)
     return m0, n
-

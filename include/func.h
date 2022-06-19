@@ -1,13 +1,10 @@
 // func.h
 // Created by sam on 2021/12/22.
-// BE-AWARE :
-//  spike Gemmini only accept to import your custom function in <file.h>, unaccept to import <file.c>.
+////Gemmini only accept to import your custom function in <file.h>,
+/// unaccept to import <file.c>.
 
 #ifndef GEMMINI_PROJECTS_FUNC_H
 #define GEMMINI_PROJECTS_FUNC_H
-//#include "include/gemmini.h"
-//#include "include/gemmini_params.h"
-//#include "include/gemmini_nn.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -16,8 +13,24 @@
 #include <limits.h>
 #include <time.h>
 
+#define elem_t_max 127
+#define elem_t_min -128
 typedef int8_t elem_t;
 typedef int32_t acc_t;
+
+static void block_print(int batch_size, int output_width, int out_channels,
+                        elem_t out_feature[batch_size][output_width][out_channels]){
+    for (int i = 0; i < batch_size; ++i) {
+        printf("\tbatch %d\n", i);
+        for (int k = 0; k < output_width; ++k) {
+            for (int l = 0; l < out_channels; ++l) {
+                printf("\t%d\t ", out_feature[i][k][l]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
+}
 
 static double flooring(double x){
     if (x >= 0.0){
@@ -82,6 +95,13 @@ static int32_t round_near_even(double x){
     return result;
 }
 
+static double Dequantization(acc_t q, double scale, double zeroPoint){
+    return scale * (q - zeroPoint);
+}
+static int32_t Quantization(double r, double scale, double zeroPoint){
+    return (int32_t)rounding((r/scale)+zeroPoint);
+}
+
 static double expansion_function(double x){
     /** we cannot use exp() in riscv-unknown-elf compiler
      * reference : https://codereview.stackexchange.com/questions/123970/implementation-of-exp-function-in-c-using-taylor-series-expansion
@@ -98,13 +118,6 @@ static double expansion_function(double x){
 //    printf("sum = %f\n", sum);
 //    printf("exp = %f\n", exp(x));
     return sum;
-}
-
-static double Dequantization(acc_t q, double scale, double zeroPoint){
-    return scale * (q - zeroPoint);
-}
-static int32_t Quantization(double r, double scale, double zeroPoint){
-    return (int32_t)rounding((r/scale)+zeroPoint);
 }
 
 static void SoftMax(int batch_size, int in_channels, double input_feature[batch_size][in_channels]){
@@ -197,50 +210,22 @@ static void Qglobal_avg_pooling(int batch_size, int input_width, int in_channels
     }
 }
 
-
-static void Relu(int batch_size, int input_width, int in_channels, double input_feature[batch_size][1][input_width][in_channels]){
-    ////for PairNet_QDEQ_main.c
-    for (int batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
-        for (int i = 0; i < input_width; ++i) {
-            for (int j = 0; j < in_channels; ++j) {
-                if (input_feature[batch_idx][0][i][j] < 0){
-                    input_feature[batch_idx][0][i][j] = 0;
-                }
-            }
-        }
-    }
-}
-static elem_t relu_clip(int64_t x, bool use_relu){
-    ////for PairNet_QDEQ_main.c
+static elem_t clip(int64_t x){
     elem_t tmp;
-    elem_t elem_t_max = 127;
-    if (x < 0) {
-        if (use_relu){
-            tmp = 0;
-        }else{
-            if (x < -128){
-                tmp = -128;
-            }else{
-                tmp = (elem_t)x;
-            }
-        }
-
+    if (x < elem_t_min){
+        tmp = elem_t_min;
+    }else if (x > elem_t_max){
+        tmp = elem_t_max;
     }else{
-        if (x > elem_t_max){
-            tmp = elem_t_max;
-        }else{
-            tmp=(elem_t)x;
-        }
+        tmp=(elem_t)x;
     }
     return tmp;
 }
 
-static elem_t QRelu_Clip(int32_t x,elem_t Z3, elem_t Z4 ,bool use_relu){
-
+static elem_t QRelu_Clip(int32_t x, elem_t Z4 ,bool use_relu){
     elem_t tmp;
-    elem_t elem_t_max = 127 ,elem_t_min = -128;
     if (use_relu){
-        if (x < (int32_t)Z3){
+        if (x < (int32_t)Z4){
             tmp = (elem_t)Z4;
         }else if (x > elem_t_max){
             tmp = (elem_t)elem_t_max;
@@ -260,7 +245,6 @@ static elem_t QRelu_Clip(int32_t x,elem_t Z3, elem_t Z4 ,bool use_relu){
 }
 
 static void Matmul(size_t I, size_t K, size_t J, double matrixA[I][K],const double matrixB[K][J],const double bias[J], double matrixC[I][J]){
-    ////for PairNet_QDEQ_main.c
     for (int i = 0; i < I; ++i) {
         double tmp_res = 0.0;
         for (int j = 0; j < J; ++j) {
@@ -273,265 +257,102 @@ static void Matmul(size_t I, size_t K, size_t J, double matrixA[I][K],const doub
     }
 }
 
-static void block_print1(int batch_size, int output_width, int out_channels,
-                         elem_t out_feature[batch_size][output_width][out_channels]){
-    for (int i = 0; i < batch_size; ++i) {
-        printf("\tbatch %d\n", i);
-        for (int k = 0; k < output_width; ++k) {
-            for (int l = 0; l < out_channels; ++l) {
-                printf("\t%d\t ", out_feature[i][k][l]);
-            }
-            printf("\n");
-        }
-        printf("\n");
-    }
-}
-
-static void block_DEQ_print(int batch_size, int output_width, int out_channels, elem_t out_feature[batch_size][1][output_width][out_channels],
-                            double S4, elem_t Z4){
-    for (int i = 0; i < batch_size; ++i) {
-        printf("batch %d\n", i);
-        for (int k = 0; k < output_width; ++k) {
-            for (int l = 0; l < out_channels; ++l) {
-                printf("%f\t ", Dequantization(out_feature[i][0][k][l], S4, Z4));
-            }
-            printf("\n");
-        }
-        printf("\n");
-    }
-}
-
-static void dequantizer(size_t output_width, size_t out_channels, elem_t output_feature[output_width][out_channels],
-                        double quantize_scale, double down_scalar, double dequantized_feature[output_width][out_channels]){
-    ////for PairNet_QDEQ_main.c
-    for (int j = 0; j < output_width; ++j) {
-        for (int k = 0; k < out_channels; ++k) {
-            dequantized_feature[j][k] = (double )output_feature[j][k] / (quantize_scale * down_scalar);
-        }
-    }
-}
-static double quantizer(size_t I, size_t K, size_t J , double input_feature[I][K], elem_t quantized_feature[I][K],
-                        double kernel[K][J], elem_t quantized_kernel[K][J]) {
-    ////for PairNet_QDEQ_main.c
-
-    /* Quantize input_feature in linear way*/
-    //quantize feature
-    double fp_max = -1000.0;
-    for (int j = 0; j < I; ++j) {
-        for (int k = 0; k < K; ++k) {
-            if (fp_max < input_feature[j][k]){
-                fp_max = input_feature[j][k];
-            }
-        }
-    }
-    double fp_min = 1000.0;
-    for (int j = 0; j < I; ++j) {
-        for (int k = 0; k < K; ++k) {
-            if (fp_min > input_feature[j][k]){
-                fp_min = input_feature[j][k];
-            }
-        }
-    }
-    double abs_max = fp_max, abs_min = fp_min;
-    if (abs_min < 0) {
-        abs_min = 0.0 - abs_min;
-    }
-    if (abs_max < 0) {
-        abs_max = 0.0 - abs_max;
-    }
-    double maxx = (abs_max > abs_min) ? abs_max : abs_min;
+static void QDense_gemmini(size_t I, size_t K, size_t J,const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[J],
+                           elem_t matrixC[I][J],double S1, elem_t Z1,double S2 , elem_t Z2,double S2_bias, elem_t Z2_bias,double S3, elem_t Z3){
+    elem_t A[I][K], B[K][J];
     for (int i = 0; i < I; ++i) {
         for (int k = 0; k < K; ++k) {
-            /*Region input_feature from [fp_min,fp_max] to [-1,1]*/
-            double tmp = input_feature[i][k] / maxx;
-            /*Region input_feature from [-1,1] to [-128,127]*/
-            tmp = rounding(tmp * 128);
-            //clip
-            if (tmp > 127) { tmp = 127; }
-            else if (tmp < -128) { tmp = -128; }
-            quantized_feature[i][k] = (elem_t) tmp;
+            A[i][k] = clip(matrixA[i][k] - Z1);
         }
     }
-    //quantize kernel
     for (int k = 0; k < K; ++k) {
         for (int j = 0; j < J; ++j) {
-            double tmp = rounding(kernel[k][j] * 128);
-            //clip
-            if (tmp > 127) { tmp = 127; }
-            else if (tmp < -128) { tmp = -128; }
-            quantized_kernel[k][j] = (elem_t) tmp;
-        }
-    }
-    double quantize_scale = 128 * 128 / maxx;
-    return quantize_scale;
-}
-
-static double calculate_DownScalar(size_t I, size_t K, size_t J, elem_t quantized_feature[I][K], elem_t quantized_kernel[K][J]){
-    ////for PairNet_QDEQ_main.c
-    /*matmul*/
-    int64_t result[I][J];
-    for (int i = 0; i < I; ++i) {
-        int64_t tmp_res = 0;
-        for (int j = 0; j < J; ++j) {
-            for (int k = 0; k < K; ++k) {
-                tmp_res += quantized_feature[i][k] * quantized_kernel[k][j];
-            }
-            result[i][j] = tmp_res;
-            tmp_res = 0;
-        }
-    }
-    int64_t res_max = -1000;
-    for (int i = 0; i < I; ++i) {
-        for (int j = 0; j < J; ++j) {
-            if (res_max < result[i][j]){
-                res_max = result[i][j];
-            }
-        }
-    }
-    int64_t res_min = 1000;
-    for (int i = 0; i < I; ++i) {
-        for (int j = 0; j < J; ++j) {
-            if (res_min > result[i][j]){
-                res_min = result[i][j];
-            }
-        }
-    }
-    int64_t abs_res_max = res_max , abs_res_min = res_min;
-    if ( abs_res_max < 0){abs_res_max = 0 - abs_res_max;}
-    if ( abs_res_min < 0){abs_res_min = 0 - abs_res_min;}
-    int64_t maxx = (abs_res_max > abs_res_min) ? abs_res_max : abs_res_min;
-
-//    printf("DownScalar = %f\n",128.0 / (double )maxx);
-    return 128.0 / (double )maxx;
-}
-
-static void QMatmul(size_t I, size_t K, size_t J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[J],
-                    elem_t matrixC[I][J],double S1, elem_t Z1,double S2 , elem_t Z2,double S2_bias, elem_t Z2_bias,double S3, elem_t Z3){
-    /**with pre-compute bias**/
-    acc_t total_bias[I][J];
-    for (int i = 0; i < I; ++i) {
-        double tmp_res = 0;
-        for (int j = 0; j < J; ++j) {
-            for (int k = 0; k < K; ++k) {
-                tmp_res += (double )((Z2 * Z1) - (matrixB[k][j] * Z1) - (matrixA[i][k] * Z2)) ;
-            }
-            total_bias[i][j] = (acc_t)rounding(tmp_res + ((S2_bias / (S2 * S1)) * (bias[j] - Z2_bias))
-                                               + (Z3 / ((S1 * S2) / S3)));
-            tmp_res = 0;
+            B[k][j] = clip(matrixB[k][j] - Z2);
         }
     }
     /**Gemmini*/
 //    enum tiled_matmul_type_t tiled_matmul_type = WS;
-//    tiled_matmul_auto(I, J,K, (elem_t*)matrixA, (elem_t*)matrixB,(acc_t*)total_bias, (elem_t*)matrixC,
+//    tiled_matmul_auto(I, J,K, (elem_t*)A, (elem_t*)B,(acc_t*)bias, (elem_t*)matrixC,
 //                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,
-//                      (S1 * S2 / S3),0,false,false,false,false,false,3,tiled_matmul_type);
-//    for (int i = 0; i < I; ++i) {
-//        for (int j = 0; j < J; ++j) {
-//            matrixC[i][j] = QRelu_Clip(matrixC[i][j], Z3, 0, false);
-//        }
-//    }
+//                      ((S1 * S2) / S3),0,true,false,false,false,false,3,tiled_matmul_type);
+}
+
+static void QDense_cpu(size_t I, size_t K, size_t J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[J],
+                       elem_t matrixC[I][J],double S1, elem_t Z1,double S2 , elem_t Z2,double S2_bias, elem_t Z2_bias,double S3, elem_t Z3){
+    elem_t A[I][K], B[K][J];
+    for (int i = 0; i < I; ++i) {
+        for (int k = 0; k < K; ++k) {
+            A[i][k] = clip(matrixA[i][k] - Z1);
+        }
+    }
+    for (int k = 0; k < K; ++k) {
+        for (int j = 0; j < J; ++j) {
+            B[k][j] = clip(matrixB[k][j] - Z2);
+        }
+    }
     /**cpu*/
     for (int i = 0; i < I; ++i) {
         double tmp_res = 0.0;
         for (int j = 0; j < J; ++j) {
             for (int k = 0; k < K; ++k) {
-                tmp_res += (double )(matrixA[i][k] * matrixB[k][j]) ;
+                tmp_res += (double )((A[i][k]) * (B[k][j])) ;
             }
-            matrixC[i][j] = QRelu_Clip(round_near_even((((S1 * S2) / S3) * (tmp_res + total_bias[i][j]))),0, 0, false);
+            matrixC[i][j] = QRelu_Clip(round_near_even((((S1 * S2) / S3) * (tmp_res +  bias[j]))), 0, false);
             tmp_res = 0;
         }
     }
 }
-
-//static void QDense_Gemmini(int I, int K, int J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[I][J],
-//                   elem_t matrixC[I][J], double downScalar) {
-//    /**Gemmini**/
-//    enum tiled_matmul_type_t tiled_matmul_type = WS;
-//    tiled_matmul_auto(I, J, K, (elem_t *) matrixA, (elem_t *) matrixB, (acc_t *) bias, (elem_t *) matrixC,
-//                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, NO_ACTIVATION,
-//                      (float) downScalar, 0, false, false, false, false, false, 3, tiled_matmul_type);
-//}
-static void QDense_cpu(int I, int K, int J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[I][J],
-                   elem_t matrixC[I][J], double downScalar){
-    /**CPU**/
-    for (int i = 0; i < I; ++i) {
-        double tmp_res = 0.0;
-        for (int j = 0; j < J; ++j) {
-            for (int k = 0; k < K; ++k) {
-                tmp_res += (double )(matrixA[i][k] * matrixB[k][j]) ;
+static void padding_same_gemmini(int batch_size,int input_width,int in_channels,const elem_t feature[batch_size][input_width][in_channels],
+                                 int padding_size, int stride,elem_t padd_feature[batch_size][input_width+padding_size][in_channels]){
+    int start_idx = 0;
+    if (padding_size % 2 == 0 && stride==1){
+//        printf("padding case 1\n");
+        //padding into front and back with same size.
+        start_idx = (int)(padding_size / 2);
+    }else{
+//        printf("padding case 2\n");
+    }
+    for (int i = 0; i < batch_size; ++i) {
+        for (int j = 0; j < input_width; ++j) {
+            for (int k = 0; k < in_channels; ++k) {
+                padd_feature[i][j+start_idx][k] = feature[i][j][k];
             }
-            matrixC[i][j] = (elem_t)round_near_even((downScalar * (tmp_res + bias[i][j])));
-            tmp_res = 0;
         }
     }
 }
 
-static void conv1d_TF(const double *in_feature, size_t input_batch_size, size_t input_width, size_t in_channels,
-                      const double *weight,size_t out_channels,size_t kernel_size,size_t stride_size,
-                      size_t padding_front, size_t padding_back, size_t output_width,
-                      double out_feature[input_batch_size][1][output_width][out_channels]) {
-    /**tensorflow conv1d**/
-    //kernel_size = kernel_group
-    double reshape_kernel[kernel_size * in_channels][out_channels];
-    int kernel_idx = 0;
-    for (int i = 0; i < kernel_size * in_channels; ++i) {
-        for (int j = 0; j < out_channels; ++j) {
-            reshape_kernel[i][j] = weight[kernel_idx];
-            kernel_idx += 1;
-        }
-    }
-//    printf("Kernel:\n");
-//    pprint(kernel_size * in_channels,out_channels,reshape_kernel);
-
-    bool padding_front_flag = (padding_front !=0) ? true : false;
-
-    size_t padding_shape = input_width + padding_front + padding_back;
-
-    int index = 0;
-//    int batch_num = 0;
-    for (size_t batch_idx = 0;batch_idx < (input_batch_size * input_width * in_channels); batch_idx += (input_width * in_channels)) {
-//        printf("%d\n",batch_num);
-//        batch_num += 1;
-
-        /*reshape & padding input_feature*/
-        double reshape_feature[output_width][kernel_size * in_channels];
-        size_t padding_front_idx = 0;
-        if (padding_front_flag){
-            padding_front_idx = 1 * in_channels;
-        }
-        double padding_feature[1 * padding_shape * in_channels];
-        for (int i = 0; i < input_width * in_channels; ++i) {
-            padding_feature[padding_front_idx + i] = in_feature[batch_idx + i];
-        }
-        size_t start = 0;
-        for (size_t i = 0; i < output_width; ++i) {
-            for (int j = 0; j < (kernel_size * in_channels); ++j) {
-                reshape_feature[i][j] = padding_feature[(start + j)];
-            }
-            start += stride_size * in_channels;
-        }
-//        printf("Feature:\n");
-//        pprint(output_width,kernel_size * in_channels,reshape_feature);
-        /*matmul*/
-        double result_matrix[output_width][out_channels];
-        for (int i = 0; i < output_width; ++i) {
-            double tmp_res = 0.0;
-            for (int j = 0; j < out_channels; ++j) {
-                for (int k = 0; k < kernel_size * in_channels; ++k) {
-                    tmp_res += reshape_feature[i][k] * reshape_kernel[k][j];
+static void conv1d_original_padd(int batch_size,int input_width,int in_channels,const elem_t feature[batch_size][input_width][in_channels],
+                                 int kernel_size,int out_channels,int stride_size,const elem_t kernel[kernel_size][in_channels][out_channels],
+                                 int output_width, int padding_size,elem_t result[batch_size][output_width][out_channels]){
+    int padding_shape = input_width + padding_size;
+    elem_t padd_feature[batch_size][padding_shape][in_channels];
+    memset(padd_feature, 0, (batch_size*padding_shape*in_channels)*sizeof(elem_t));
+    padding_same_gemmini(batch_size, input_width, in_channels, feature, padding_size, stride_size, padd_feature);
+    for(int b = 0; b < batch_size; b++){
+        int col = 0;
+        for(int out = 0; out < out_channels; out++){
+            bool stop_flag = false;
+            int row = 0;
+            for(int i = 0; i < input_width && !stop_flag; i+=stride_size){
+                acc_t sum = 0;
+                for(int j = 0; j < in_channels; j++){
+                    for (int k = 0; k < kernel_size; ++k) {
+//                        printf("%d * %d\n", feature[b][i+k][j], kernel[k][j][out]);
+                        sum += padd_feature[b][i+k][j] * kernel[k][j][out];
+                    }
                 }
-                result_matrix[i][j] = tmp_res;
-                tmp_res = 0;
+//                printf("%d ", sum);
+                result[b][row][col] = clip(sum);
+                row++;
+                if (row >= output_width){
+                    stop_flag = true;
+                }
             }
+            col++;
         }
-        for (int i = 0; i < output_width; ++i) {
-            for (int j = 0; j < out_channels; ++j) {
-                out_feature[index][0][i][j] = result_matrix[i][j];
-            }
-        }
-        index += 1;
     }
-};
+}
+
 
 static void conv1d_original(int batch_size,int input_width,int in_channels,const elem_t feature[batch_size][input_width][in_channels],
                             int kernel_size,int out_channels,int stride_size,const elem_t kernel[kernel_size][in_channels][out_channels],
@@ -549,7 +370,7 @@ static void conv1d_original(int batch_size,int input_width,int in_channels,const
                         sum += feature[b][i+k][j] * kernel[k][j][out];
                     }
                 }
-                result[b][row][col] = QRelu_Clip(round_near_even((sum+bias[b][row][col])*downScalar),Z3, Z4, true);
+                result[b][row][col] = QRelu_Clip(round_near_even((sum+bias[b][row][col])*downScalar),Z4, true);
 //                printf("\n%d\n", result[b][row][col]);
                 row++;
             }
@@ -559,378 +380,134 @@ static void conv1d_original(int batch_size,int input_width,int in_channels,const
     }
 }
 
-static void conv1d_matmul_QDEQ(size_t batch_size, size_t input_width, size_t in_channels,
-                        const double in_feature[batch_size][1][input_width][in_channels],
-                        size_t kernel_size,size_t out_channels,size_t stride_size,
-                        const double weight[1][kernel_size][in_channels][out_channels],
-                        size_t padding_front, size_t padding_back, size_t output_width,
-                        double out_feature[batch_size][1][output_width][out_channels]) {
-//    enum tiled_matmul_type_t tiled_matmul_type = WS;
-    //kernel_size = kernel_group
-    double reshape_kernel[kernel_size * in_channels][out_channels];
-    for (int i = 0; i < kernel_size; ++i) {
-        for (int j = 0;j < in_channels;++j) {
-            for (int k = 0;k < out_channels;++k) {
-                reshape_kernel[(i* in_channels)+j][k] = weight[0][i][j][k];
-            }
-        }
-    }
-//    printf("Kernel:\n");
-//    for (int i = 0; i < kernel_size * in_channels; ++i) {
-//        for (int j = 0; j < out_channels; ++j) {
-//            printf("%.15f ",reshape_kernel[i][j]);
-//        }
-//        printf("\n");
-//    }
-    bool padding_front_flag = (padding_front !=0) ? true : false;
 
-    size_t padding_shape = input_width + padding_front + padding_back;
-
-    for (size_t batch_idx = 0;batch_idx < batch_size; ++batch_idx) {
-
-        /*reshape & padding input_feature*/
-        double reshape_feature[output_width][kernel_size * in_channels];
-        size_t padding_front_idx = 0;
-        if (padding_front_flag){
-            padding_front_idx = 1 * in_channels;
-        }
-        double padding_feature[1 * padding_shape * in_channels];
-        for (int i = 0; i < input_width ; ++i) {
-            for (int j = 0; j < in_channels; ++j) {
-                padding_feature[padding_front_idx] = in_feature[batch_idx][0][i][j];
-                padding_front_idx += 1;
+static void pre_compute_bias(size_t in_channels , size_t kernel_size, size_t output_width, size_t out_channels,
+                             const elem_t feature[output_width][kernel_size*in_channels],
+                             const elem_t kernel[kernel_size*in_channels][out_channels], const acc_t bias[out_channels],
+                             acc_t total_bias[output_width][out_channels], double S1, elem_t Z1,double S2 , elem_t Z2,
+                             double S2_bias, elem_t Z2_bias, double S4, elem_t Z4){
+    for (int i = 0; i < output_width; ++i) {
+        double tmp_bias = 0;
+        for (int j = 0; j < out_channels; ++j) {
+            for (int k = 0; k < kernel_size * in_channels; ++k) {
+                tmp_bias += (double )((Z2 * Z1 ) - (kernel[k][j] * Z1) - (feature[i][k] * Z2) );
             }
-        }
-        size_t start = 0;
-        for (size_t i = 0; i < output_width; ++i) {
-            for (int j = 0; j < (kernel_size * in_channels); ++j) {
-                reshape_feature[i][j] = padding_feature[(start + j)];
-            }
-            start += stride_size * in_channels;
-        }
-//        printf("Feature:\n");
-//        for (int i = 0; i < output_width; ++i) {
-//            for (int j = 0; j < kernel_size * in_channels; ++j) {
-//                printf("%.15f ",reshape_feature[i][j]);
-//            }
-//            printf("\n");
-//        }
-        /**quantize**/
-        elem_t quantized_feature[output_width][kernel_size*in_channels];
-        elem_t quantized_kernel[kernel_size*in_channels][out_channels];
-        double quantize_scale = quantizer(output_width, kernel_size * in_channels, out_channels,
-                                          reshape_feature, quantized_feature, reshape_kernel, quantized_kernel);
-        /**gemmini matmul**/
-        elem_t gemmini_result[output_width][out_channels];
-
-        double down_scalar = calculate_DownScalar(output_width,kernel_size*in_channels,out_channels,quantized_feature,quantized_kernel);
-//        tiled_matmul_auto(output_width, out_channels,kernel_size*in_channels, (elem_t*)quantized_feature, (elem_t*)quantized_kernel,
-//                          NULL, (elem_t*)gemmini_result, kernel_size*in_channels, out_channels, out_channels, out_channels,
-//                          MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,down_scalar,0,false,
-//                          false,false,false,false,3,tiled_matmul_type);
-        for (int i = 0; i < output_width; ++i) {
-            int64_t tmp_res = 0;
-            for (int j = 0; j < out_channels; ++j) {
-                for (int k = 0; k < kernel_size * in_channels; ++k) {
-                    tmp_res += quantized_feature[i][k] * quantized_kernel[k][j];
-                }
-                gemmini_result[i][j] = relu_clip(round_near_even((double )tmp_res * down_scalar), false);
-                tmp_res = 0;
-            }
-        }
-//        printf("\nbatch idx = %d\n", index);
-//        for (int i = 0; i < output_width;++i){
-//            for (int j = 0;j<out_channels;++j){
-//                printf("%d\t", gemmini_result[i][j]);
-//            }
-//            printf("\n");
-//        }
-        /**dequantize**/
-        //double dequantize_result[output_width][out_channels];
-        //dequantize(output_width, out_channels, gemmini_result, quantize_scale, down_scalar, dequantize_result);
-
-        for (int i = 0; i < output_width; ++i) {
-            for (int j = 0; j < out_channels; ++j) {
-                out_feature[batch_idx][0][i][j] = ((double )gemmini_result[i][j]) / (quantize_scale * down_scalar);
-                //out_feature[index][0][i][j] = dequantize_result[i][j];
-            }
+            total_bias[i][j] = (acc_t)rounding(tmp_bias + ((S2_bias / (S2 * S1)) * (bias[j] - Z2_bias))
+                                               + (Z4 / ((S1 * S2) / S4)));
+            tmp_bias = 0;
         }
     }
 }
 
-static void conv1d_TF_folding(size_t batch_size, size_t input_width, size_t in_channels,
+static void conv1d2matmul_cpu(size_t batch_size, size_t input_width, size_t in_channels,
                               const elem_t in_feature[batch_size][input_width][in_channels],
                               size_t kernel_size, size_t out_channels,size_t stride_size,
                               const elem_t conv1d_weight[kernel_size][in_channels][out_channels],
-                              size_t padding_front, size_t padding_back, size_t output_width,
-                              const acc_t conv1d_bias[output_width][out_channels],double S1, elem_t Z1,
-                              double S2 , elem_t Z2,double S2_bias, elem_t Z2_bias,double S3, elem_t Z3,
-                              double S4, elem_t Z4,elem_t out_feature[batch_size][output_width][out_channels]) {
-    /** We folding trained-params of Batch_Normalization layers into Conv1d trained-Weights become trained-Weights,trained-Bias.
-     *  We quantized all the trained-Weights,trained-Bias, Input Signals into region int8[-128, 127].
-     *  S1,Z1 : the scalar and zeroPoint we found from the previous layer.
-     *  S2,Z2 : the scalar and zeroPoint we found from trained-Weights,trained-Bias.
-     *  S3,Z3 : the scalar and zeroPoint we found from the result of the conv1d.
-     *  S4,Z4 : the scalar and zeroPoint we found from the result of Relu&Clip.
-     *  BE-AWARE Relu&Clip :
-     *   Because the elements distribute in [Z3, 127] after Relu&clip, not [0, 127].
-     *   S4 = (r4_max - r4_min) / (127 - Z3)
-     *   Z4 = 127 - (r4_max) / S4
+                              size_t output_width,const acc_t conv1d_bias[out_channels],
+                              double S1, elem_t Z1,double S2 , elem_t Z2,double S2_bias,elem_t Z2_bias,
+                              double S4, elem_t Z4, elem_t out_feature[batch_size][output_width][out_channels]) {
+    /** We folding BatchNorm weights into Conv1d weights and Bias.
+     *  q4 = M *( matmul((q1 - z1), (q2 - z2)) + (sb / (s1*s2))*(bias - zb))+(z4/(s1 * s2/s4)) )
+     *  q4 = q4 < Z4 ? Z4 : q4
      * **/
     /**reshape kernel**/
     elem_t reshape_kernel[kernel_size * in_channels][out_channels];
     for (int i = 0; i < kernel_size; ++i) {
         for (int j = 0;j < in_channels;++j) {
             for (int k = 0;k < out_channels;++k) {
-                reshape_kernel[(i* in_channels)+j][k] = conv1d_weight[i][j][k];
+                reshape_kernel[(i* in_channels)+j][k] = clip(conv1d_weight[i][j][k] - Z2);
             }
         }
     }
-    bool padding_front_flag = (padding_front !=0) ? true : false;
-
-    size_t padding_shape = input_width + padding_front + padding_back;
 
     for (size_t batch_idx = 0;batch_idx < batch_size; ++batch_idx) {
 
-        /**reshape & padding input_feature**/
+        /**reshape input_feature**/
         elem_t reshape_feature[output_width][kernel_size * in_channels];
-        size_t padding_front_idx = 0;
-        if (padding_front_flag){
-            padding_front_idx = 1 * in_channels;
-        }
-        elem_t padding_feature[1 * padding_shape * in_channels];
+        size_t reshape_idx = 0;
+        elem_t flatten_feature[1*input_width*in_channels];
         for (int i = 0; i < input_width ; ++i) {
             for (int j = 0; j < in_channels; ++j) {
-                padding_feature[padding_front_idx] = in_feature[batch_idx][i][j];
-                padding_front_idx += 1;
+                flatten_feature[reshape_idx] = in_feature[batch_idx][i][j];
+                reshape_idx += 1;
             }
         }
         size_t start = 0;
         for (size_t i = 0; i < output_width; ++i) {
             for (int j = 0; j < (kernel_size * in_channels); ++j) {
-                reshape_feature[i][j] = padding_feature[(start + j)];
+                reshape_feature[i][j] = clip(flatten_feature[(start + j)] - Z1);
             }
             start += stride_size * in_channels;
         }
-        /**gemmini matmul**/
-        ////pre-calculation bias
-        acc_t total_bias[output_width][out_channels];
+        /**cpu matmul**/
         for (int i = 0; i < output_width; ++i) {
-            double tmp_bias = 0;
+            acc_t tmp_res = 0;
             for (int j = 0; j < out_channels; ++j) {
                 for (int k = 0; k < kernel_size * in_channels; ++k) {
-                    tmp_bias += (double )((Z2 * Z1 ) - (reshape_kernel[k][j] * Z1) -
-                                          (reshape_feature[i][k] * Z2) );
+                    tmp_res += (acc_t )(reshape_feature[i][k] * reshape_kernel[k][j]);
                 }
-                total_bias[i][j] = (acc_t)rounding(tmp_bias + ((S2_bias / (S2 * S1)) * (conv1d_bias[i][j] - Z2_bias))
-                                                   + (Z3 / ((S1 * S2) / S4)));
-                tmp_bias = 0;
-            }
-        }
-//        enum tiled_matmul_type_t tiled_matmul_type = WS;
-//        elem_t gemmini_result[output_width][out_channels];
-//        tiled_matmul_auto(output_width, out_channels,kernel_size*in_channels, (elem_t*)reshape_feature, (elem_t*)reshape_kernel,
-//                          (acc_t*)total_bias, (elem_t*)gemmini_result, kernel_size*in_channels, out_channels, out_channels, out_channels,
-//                          MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,(S1 * S2 / S4),0,false,
-//                          false,false,false,false,3,tiled_matmul_type);
-//        for (int i = 0; i < output_width; ++i) {
-//            for (int j = 0; j < out_channels; ++j) {
-//                out_feature[batch_idx][0][i][j] = QRelu_Clip(gemmini_result[i][j], Z3, Z4, true);
-//            }
-//        }
-        for (int i = 0; i < output_width; ++i) {
-            double tmp_res = 0;
-            for (int j = 0; j < out_channels; ++j) {
-                for (int k = 0; k < kernel_size * in_channels; ++k) {
-                    tmp_res += (double )(reshape_feature[i][k] * reshape_kernel[k][j]);
-                }
-                out_feature[batch_idx][i][j] = QRelu_Clip(round_near_even((((S1 * S2) / S4 ) * (tmp_res + total_bias[i][j]))),Z3, Z4, true);
-//                out_feature[batch_idx][0][i][j] = round_near_even((((S1 * S2) / S4 ) * (tmp_res + total_bias[i][j])));
-
+                out_feature[batch_idx][i][j] = QRelu_Clip(round_near_even((((S1 * S2) / S4 ) * (tmp_res + conv1d_bias[j]))), Z4, true);
                 tmp_res = 0;
             }
         }
     }
 }
 
-static void conv1d_matmul_GemminiRelu(size_t batch_size, size_t input_width, size_t in_channels,
-                          const elem_t in_feature[batch_size][input_width][in_channels],
-                          size_t kernel_size, size_t out_channels,size_t stride_size,
-                          const elem_t conv1d_weight[kernel_size][in_channels][out_channels],
-                          size_t padding_front, size_t padding_back, size_t output_width,
-                          const acc_t total_bias[batch_size][output_width][out_channels],double downScalar,
-                          elem_t Z3, elem_t Z4,elem_t out_feature[batch_size][output_width][out_channels]){
-    /**without pre-compute bias**/
+static void conv1d2matmul_gemmini(size_t batch_size, size_t input_width, size_t in_channels,
+                                  const elem_t in_feature[batch_size][input_width][in_channels],
+                                  size_t kernel_size, size_t out_channels,size_t stride_size,
+                                  const elem_t conv1d_weight[kernel_size][in_channels][out_channels],
+                                  size_t output_width,const acc_t conv1d_bias[out_channels],double S1, elem_t Z1,
+                                  double S2 , elem_t Z2,double S2_bias, elem_t Z2_bias,double S4, elem_t Z4,
+                                  elem_t out_feature[batch_size][output_width][out_channels]) {
+    /** We folding BatchNorm weights into Conv1d weights and Bias.
+     *  q4 = M *( matmul((q1 - z1), (q2 - z2)) + (sb / (s1*s2))*(bias - zb))+(z4/(s1 * s2/s4)) )
+     *  q4 = q4 < Z4 ? Z4 : q4
+     * **/
     /**reshape kernel**/
     elem_t reshape_kernel[kernel_size * in_channels][out_channels];
     for (int i = 0; i < kernel_size; ++i) {
         for (int j = 0;j < in_channels;++j) {
             for (int k = 0;k < out_channels;++k) {
-                reshape_kernel[(i* in_channels)+j][k] = conv1d_weight[i][j][k];
+                reshape_kernel[(i* in_channels)+j][k] = clip(conv1d_weight[i][j][k] - Z2);
             }
         }
     }
-    bool padding_front_flag = (padding_front !=0) ? true : false;
-
-    size_t padding_shape = input_width + padding_front + padding_back;
 
     for (size_t batch_idx = 0;batch_idx < batch_size; ++batch_idx) {
 
-        /**reshape & padding input_feature**/
+        /**reshape input_feature**/
         elem_t reshape_feature[output_width][kernel_size * in_channels];
-        size_t padding_front_idx = 0;
-        if (padding_front_flag) {
-            padding_front_idx = 1 * in_channels;
-        }
-        elem_t padding_feature[1 * padding_shape * in_channels];
-        for (int i = 0; i < input_width; ++i) {
+        size_t reshape_idx = 0;
+        elem_t flatten_feature[1*input_width*in_channels];
+        for (int i = 0; i < input_width ; ++i) {
             for (int j = 0; j < in_channels; ++j) {
-                padding_feature[padding_front_idx] = in_feature[batch_idx][i][j];
-                padding_front_idx += 1;
+                flatten_feature[reshape_idx] = in_feature[batch_idx][i][j];
+                reshape_idx += 1;
             }
         }
         size_t start = 0;
         for (size_t i = 0; i < output_width; ++i) {
             for (int j = 0; j < (kernel_size * in_channels); ++j) {
-                reshape_feature[i][j] = padding_feature[(start + j)];
+                reshape_feature[i][j] = clip(flatten_feature[(start + j)] - Z1);
             }
             start += stride_size * in_channels;
         }
+        /**gemmini matmul**/
         elem_t gemmini_result[output_width][out_channels];
-        /*enum tiled_matmul_type_t tiled_matmul_type = WS;
-        tiled_matmul_auto2(output_width, out_channels, kernel_size * in_channels, (elem_t *) reshape_feature,
-                           (elem_t *) reshape_kernel,
-                           (acc_t *) total_bias[batch_idx][0], (elem_t *) gemmini_result, kernel_size * in_channels,
-                           out_channels, out_channels, out_channels,
-                           MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, RELU_NUM,
-                           (float) downScalar, 0, false,
-                           false, false, false, false, 3, tiled_matmul_type, Z4);*/
+//        enum tiled_matmul_type_t tiled_matmul_type = WS;
+//        tiled_matmul_auto(output_width, out_channels,kernel_size*in_channels, (elem_t*)reshape_feature, (elem_t*)reshape_kernel,
+//                          (acc_t*)conv1d_bias, (elem_t*)gemmini_result, kernel_size*in_channels, out_channels, out_channels, out_channels,
+//                          MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,((S1 * S2) / S4),0,true,
+//                          false,false,false,false,3,tiled_matmul_type);
         for (int i = 0; i < output_width; ++i) {
             for (int j = 0; j < out_channels; ++j) {
-                out_feature[batch_idx][i][j] = gemmini_result[i][j];
+                out_feature[batch_idx][i][j] = QRelu_Clip(gemmini_result[i][j], Z4, true);
             }
         }
+
     }
-};
-
-static void conv1d_matmul_Gemmini(size_t batch_size, size_t input_width, size_t in_channels,
-                          const elem_t in_feature[batch_size][input_width][in_channels],
-                          size_t kernel_size, size_t out_channels,size_t stride_size,
-                          const elem_t conv1d_weight[kernel_size][in_channels][out_channels],
-                          size_t padding_front, size_t padding_back, size_t output_width,
-                          const acc_t total_bias[batch_size][output_width][out_channels],double downScalar,
-                          elem_t Z3, elem_t Z4,elem_t out_feature[batch_size][output_width][out_channels]){
-    /**without pre-compute bias**/
-    /**reshape kernel**/
-    elem_t reshape_kernel[kernel_size * in_channels][out_channels];
-    for (int i = 0; i < kernel_size; ++i) {
-        for (int j = 0;j < in_channels;++j) {
-            for (int k = 0;k < out_channels;++k) {
-                reshape_kernel[(i* in_channels)+j][k] = conv1d_weight[i][j][k];
-            }
-        }
-    }
-    bool padding_front_flag = (padding_front !=0) ? true : false;
-
-    size_t padding_shape = input_width + padding_front + padding_back;
-
-    for (size_t batch_idx = 0;batch_idx < batch_size; ++batch_idx) {
-
-        /**reshape & padding input_feature**/
-        elem_t reshape_feature[output_width][kernel_size * in_channels];
-        size_t padding_front_idx = 0;
-        if (padding_front_flag) {
-            padding_front_idx = 1 * in_channels;
-        }
-        elem_t padding_feature[1 * padding_shape * in_channels];
-        for (int i = 0; i < input_width; ++i) {
-            for (int j = 0; j < in_channels; ++j) {
-                padding_feature[padding_front_idx] = in_feature[batch_idx][i][j];
-                padding_front_idx += 1;
-            }
-        }
-        size_t start = 0;
-        for (size_t i = 0; i < output_width; ++i) {
-            for (int j = 0; j < (kernel_size * in_channels); ++j) {
-                reshape_feature[i][j] = padding_feature[(start + j)];
-            }
-            start += stride_size * in_channels;
-        }
-        elem_t gemmini_result[output_width][out_channels];
-        /*enum tiled_matmul_type_t tiled_matmul_type = WS;
-        tiled_matmul_auto(output_width, out_channels, kernel_size * in_channels, (elem_t *) reshape_feature,
-                          (elem_t *) reshape_kernel,
-                          (acc_t *) total_bias[batch_idx][0], (elem_t *) gemmini_result, kernel_size * in_channels,
-                          out_channels, out_channels, out_channels,
-                          MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, NO_ACTIVATION,
-                          (float) downScalar, 0, false,
-                          false, false, false, false, 3, tiled_matmul_type);*/
-
-        for (int i = 0; i < output_width; ++i) {
-            for (int j = 0; j < out_channels; ++j) {
-                out_feature[batch_idx][i][j] = QRelu_Clip(gemmini_result[i][j], Z3, Z4, true);
-            }
-        }
-    }
-};
-
-static void conv1d_matmul_cpu(size_t batch_size, size_t input_width, size_t in_channels,
-                          const elem_t in_feature[batch_size][input_width][in_channels],
-                          size_t kernel_size, size_t out_channels,size_t stride_size,
-                          const elem_t conv1d_weight[kernel_size][in_channels][out_channels],
-                          size_t padding_front, size_t padding_back, size_t output_width,
-                          const acc_t total_bias[batch_size][output_width][out_channels],double downScalar,
-                          elem_t Z3, elem_t Z4,elem_t out_feature[batch_size][output_width][out_channels]){
-    /**without pre-compute bias**/
-    /**reshape kernel**/
-    elem_t reshape_kernel[kernel_size * in_channels][out_channels];
-    for (int i = 0; i < kernel_size; ++i) {
-        for (int j = 0;j < in_channels;++j) {
-            for (int k = 0;k < out_channels;++k) {
-                reshape_kernel[(i* in_channels)+j][k] = conv1d_weight[i][j][k];
-            }
-        }
-    }
-    bool padding_front_flag = (padding_front !=0) ? true : false;
-
-    size_t padding_shape = input_width + padding_front + padding_back;
-
-    for (size_t batch_idx = 0;batch_idx < batch_size; ++batch_idx) {
-
-        /**reshape & padding input_feature**/
-        elem_t reshape_feature[output_width][kernel_size * in_channels];
-        size_t padding_front_idx = 0;
-        if (padding_front_flag) {
-            padding_front_idx = 1 * in_channels;
-        }
-        elem_t padding_feature[1 * padding_shape * in_channels];
-        for (int i = 0; i < input_width; ++i) {
-            for (int j = 0; j < in_channels; ++j) {
-                padding_feature[padding_front_idx] = in_feature[batch_idx][i][j];
-                padding_front_idx += 1;
-            }
-        }
-        size_t start = 0;
-        for (size_t i = 0; i < output_width; ++i) {
-            for (int j = 0; j < (kernel_size * in_channels); ++j) {
-                reshape_feature[i][j] = padding_feature[(start + j)];
-            }
-            start += stride_size * in_channels;
-        }
-        elem_t gemmini_result[output_width][out_channels];
-        for (int i = 0; i < output_width; ++i) {
-            double tmp_res = 0;
-            for (int j = 0; j < out_channels; ++j) {
-                for (int k = 0; k < kernel_size * in_channels; ++k) {
-                    tmp_res += (double) (reshape_feature[i][k] * reshape_kernel[k][j]);
-                }
-                out_feature[batch_idx][i][j] = QRelu_Clip(
-                        round_near_even(downScalar * (tmp_res + total_bias[batch_idx][i][j])), Z3, Z4, true);
-                tmp_res = 0;
-            }
-        }
-    }
-};
+}
 
 
 void plot_result(int batch_size, double y_axis[batch_size]);
