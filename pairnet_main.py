@@ -33,14 +33,15 @@ def run_gemmini(main_file='pairNet_ALLQ_main'):
     path = f'/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/build/bareMetalC/{save_txt}'
     with open(path, 'r') as f:
         line = f.readlines()
-    result = None
+    result = []
     for i in range(len(line)):
         if "Predict Result" in line[i]:
-            result = line[i]
-    return result.split()[-1]
+            for r in line[i].split('\t')[1:-1]:
+                result.append(eval(r))
+    return result
 
 
-def test_gemmini(main_operation, ai_application):
+def test_gemmini(main_operation, ai_application, dir_path):
     resList = []
     pre_result, gt_result = [], []
     gemmini_dir = '/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/include/'
@@ -52,7 +53,6 @@ def test_gemmini(main_operation, ai_application):
     else:
         print('Flag : main_operation should be "conv1d" or "conv2matmul"')
         raise KeyError
-
     if ai_application == 'pairnet16':
         app = 'Qpairnet_params12_16_optimal.h'
     elif ai_application == 'pairnet32':
@@ -62,32 +62,37 @@ def test_gemmini(main_operation, ai_application):
     else:
         print('Flag : ai_application should be "pairnet16" or "pairnet32" or "pairnet64"')
         raise KeyError
-    test_dir = 'Qgesture_signals_minus'
+    test_dir = dir_path
     hfiles = os.listdir(os.path.join(gemmini_dir, test_dir))
     for hfile in tqdm(hfiles, desc=test_dir):
         true_label = hfile.split('_')[-1].split('.')[0]
-        gt_result.append(eval(true_label))
+        true_label = get_label(true_label)
+        GES_NUM = len(true_label)
+        gt_result.append(true_label)
         hfile_path = f'"include/{test_dir}/{hfile}"'
         top_hfile_path = os.path.join(gemmini_dir, 'top_hfile.h')
-        print(hfile_path)
         with open(os.path.join(top_hfile_path), 'w') as file:
             file.write(f"//{datetime.datetime.now()}\n")
             file.write(f"#ifndef GEMMINI_PROJECTS_TOP_HFILE_H\n")
             file.write(f"#define GEMMINI_PROJECTS_TOP_HFILE_H\n")
             file.write(f'#include "include/{app}"\n')
             file.write(f"#include {hfile_path}\n")
+            file.write(f"#define GES_NUM {GES_NUM}\n")
             file.write(f"#endif //GEMMINI_PROJECTS_TOP_HFILE_H\n")
         pre = run_gemmini(main_file=op)
-        pre_result.append(eval(pre))
+        for i in range(len(true_label)):
+            gt_result.append(true_label[i])
+            pre_result.append(pre[i])
         print('True Label:', true_label)
         print('Predict Label:', pre)
         print()
 
     false_cnt = 0
-    for i in range(len(pre_result)):
-        if pre_result[i] != gt_result[i]:
+
+    for j in range(len(gt_result)):
+        if pre_result[j] != gt_result[j]:
             false_cnt += 1
-    acc = (len(pre_result) - false_cnt) / len(pre_result)
+    acc = (len(gt_result) - false_cnt) / len(gt_result)
     print(f"accuracy : {acc}")
     resList.append(acc)
     cm = ConfusionMatrix(actual_vector=gt_result, predict_vector=pre_result)
@@ -95,9 +100,10 @@ def test_gemmini(main_operation, ai_application):
     # cm.plot(cmap=plt.cm.Greens, number_label=True, plot_lib="matplotlib")
     # plt.show()
     # cm.print_normalized_matrix()
-    cm.plot(cmap=plt.cm.Greens, number_label=True, plot_lib="matplotlib")
+    plt.figure()
+    cm.plot(cmap=plt.cm.Greens, number_label=True, plot_lib="matplotlib", normalized=True)
     plt.savefig(f'./{ai_application}_{acc}.png')
-    plt.show()
+    # plt.show()
     return acc
 
 
@@ -132,13 +138,17 @@ def main():
     # make_Qpairnet_params(batch_size=windows.shape[0], input_width=50, stride_size=1,
     #                      input_signals=windows, gesN=gesN, path=model_path, true_label=true_lable,
     #                      header_name=f'./include/Qpairnet_params{gesN}_{channel}_{"".join([str(i) for i in true_lable])}.h')
+    test_dir = 'Qgesature_signals_test'
+    train_dir = 'Qgesature_signals'
     acc = []
-    acc_16 = test_gemmini(main_operation='conv2matmul', ai_application='pairnet16')
-    # acc_32 = test_gemmini(main_operation='conv2matmul', ai_application='pairnet32')
-    # acc_64 = test_gemmini(main_operation='conv2matmul', ai_application='pairnet64')
-    acc.append(acc_16)
-    # acc.append(acc_32)
-    # acc.append(acc_64)
+    # acc_16 = test_gemmini(main_operation='conv2matmul', ai_application='pairnet16', dir_path=test_dir)
+    acc_32 = test_gemmini(main_operation='conv2matmul', ai_application='pairnet32', dir_path=test_dir)
+    acc_64 = test_gemmini(main_operation='conv2matmul', ai_application='pairnet64', dir_path=test_dir)
+    # acc.append(acc_16)
+    # accuracy : 0.8018018018018018
+    acc.append(acc_32)
+    # accuracy : 0.7815924032140248
+    acc.append(acc_64)
     print(acc)
 
 

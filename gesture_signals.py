@@ -57,14 +57,19 @@ def make_all(dir_path):
         for txt in os.listdir(path):
             print(txt)
             windows = make_window_siginals(os.path.join(path, txt))
-            header_name = f'./include/Qgesture_signals_minus/Quantized_{txt.split("_")[0]}_{label}.h'
+            if len(windows) == 0:
+                print(f"Gesture length is too short :{txt}")
+                continue
+            header_name = f'./include/Qgesature_signals_test/Quantized_{txt.split("_")[0]}_{label}.h'
             make_Qsiginals_optimal(windows, header_name)
 
 
 if __name__ == '__main__':
     # dir_path = './OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)/'
-    # make_all(dir_path)
-    path = './OapNet/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110100_(Wen)_H50_N3_K9-8-4.txt'
-    windows = make_window_siginals(path)
-    make_Qsiginals_optimal(windows, './include/Qgesture_signals_984_test.h')
+    dir_test_path = './OapNet/test/1100920_test_(J&W&D&j&in0)/'
+    make_all(dir_test_path)
+    # path = './OapNet/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110100_(Wen)_H50_N3_K9-8-4.txt'
+    # windows = make_window_siginals(dir_test_path)
+    # print(windows.shape)
+    # make_Qsiginals_optimal(windows, './include/Qgesture_signals_984_test.h')
     # make_Qsiginals_optimal(windows, './include/Qgesture_signals_optimal_1.h')

@@ -47,6 +47,7 @@ static double flooring(double x){
     }
     return x;
 }
+
 static double rounding(double x){
     double y,r;
     y = flooring(x);

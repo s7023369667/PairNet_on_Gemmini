@@ -11,7 +11,7 @@ from Qconv1d import *
 import h5py
 
 
-def test(sliding_windows: np.ndarray, gesN: int, K: int, func):
+def test(sliding_windows: np.ndarray, gesN: int, K, func):
     batch_size = sliding_windows.shape[0]
     max_res1D = []
     for i in range(batch_size):
@@ -47,8 +47,8 @@ def test(sliding_windows: np.ndarray, gesN: int, K: int, func):
             time += 1
     # print(hash_count)
     # print(hash_time)
-
     step1_ans, step2_ans = [0] * K, [0] * K
+
     pre_max, pre_min = float('inf'), float('-inf')
     for i in range(K):
         max, label = -1, -1
@@ -78,29 +78,28 @@ def test(sliding_windows: np.ndarray, gesN: int, K: int, func):
     return step2_ans
 
 
-def read_sample(test_dir, gesN, model, save_path=None):
+def read_sample(test_dir, gesN, model, save_name=None):
     batch_size = 1
     input_shape = model.inputs[0].shape.as_list()
     input_shape[0] = batch_size
     func = tf.function(model).get_concrete_function(tf.TensorSpec(input_shape, model.inputs[0].dtype))
     pre_result, gt_result = [], []
-    acc = 0
-    # d = {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, '10': 0, '11': 0}
     for label in os.listdir(test_dir):
+        lab = get_label(label)
         path = os.path.join(test_dir, label)
         for txt in os.listdir(path):
             # d[str(label)] += 1
             print(os.path.join(path, txt))
             sliding_windows = make_window_siginals(os.path.join(path, txt))
-            pre = test(sliding_windows=sliding_windows, gesN=gesN, K=1, func=func)
-            # print(label)
-            # print(pre[0])
+            if len(sliding_windows) == 0:
+                print(f"Gesture length is too short :{txt}")
+                continue
+            pre = test(sliding_windows=sliding_windows, gesN=gesN, K=len(lab), func=func)
             if not pre == -1:
-                gt_result.append(eval(label))
-                pre_result.append(pre[0])
-            else:
-                print(f"remove : {txt}")
-                os.remove(txt)
+                for i in range(len(lab)):
+                    gt_result.append(lab[i])
+                    pre_result.append(pre[i])
+
     false_cnt = 0
     for i in range(len(pre_result)):
         if pre_result[i] != gt_result[i]:
@@ -108,24 +107,31 @@ def read_sample(test_dir, gesN, model, save_path=None):
     acc = (len(pre_result) - false_cnt) / len(pre_result)
     print(f"accuracy : {acc}")
     cm = ConfusionMatrix(actual_vector=gt_result, predict_vector=pre_result)
-    cm.print_matrix()
-    # print(d)
-    # cm.print_normalized_matrix()
-    cm.plot(cmap=plt.cm.Greens, number_label=True, plot_lib="matplotlib")
-    plt.show()
-    # plt.savefig()
+    # cm.print_matrix()
+    cm.print_normalized_matrix()
+    plt.figure()
+    cm.plot(cmap=plt.cm.Greens, number_label=True, plot_lib="matplotlib", normalized=True)
+    # plt.show()
+    plt.savefig(f'./{save_name}_tf.png')
     return acc
 
+def get_label(file_label):
+    if '-' in file_label:
+        txt_label = list(map(eval, file_label.split('-')))  # 資料夾名稱1-2-5 >> [1, 2, 5]
+    else:
+        txt_label = [eval(file_label)]
+    return txt_label
 
 def main():
     res = []
     gesN = 12
+    test_dir = '../OapNet/test/1100920_test_(J&W&D&j&in0)/'
     path_dir = '../OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)/'
     models = ['./model/pairnet_model16_12_20220503.h5', './model/pairnet_model32_12_20220605.h5',
               './model/pairnet_model64_12_20220503.h5']
     for m in models:
         model_pairNet = load_model(f'{m}')
-        res.append(read_sample(path_dir, gesN=gesN, model=model_pairNet))
+        res.append(read_sample(test_dir, gesN=gesN, model=model_pairNet, save_name=m.split('/')[-1][:-12]))
 
     print(res)
     # # TF : [0.9888991674375578, 0.9935245143385754, 0.9935245143385754]
@@ -136,10 +142,4 @@ def main():
 if __name__ == '__main__':
     main()
 
-    # path_dir = '1071109_test_1-2-3-4_New12_test/'
-    # model_pairNet = load_model(f'./pairnet_model16_10_20220522_seq.h5')
-    # batch_size = 1
-    # input_shape = model_pairNet.inputs[0].shape.as_list()
-    # input_shape[0] = batch_size
-    # func = tf.function(model_pairNet).get_concrete_function(tf.TensorSpec(input_shape, model_pairNet.inputs[0].dtype))
-    # read_sample(test_dir=path_dir, gesN=gesN, model=func)
+

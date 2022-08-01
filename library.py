@@ -73,6 +73,7 @@ def test_ap(fp_feature: np.ndarray):
 def make_window_siginals(txt_path):
     queue = []
     window_size = 50
+
     with open(txt_path, 'r') as f:
         window = []
         pairNet_samples = f.readlines()[:-50]
