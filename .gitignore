@@ -5,3 +5,8 @@
 /Oap/train/trans_all/
 /pbPlots/
 /OapNet/
+/L5bias_quantization.png
+/L5weight_quantization.png
+/LBL_oneWindow.csv
+/total_windows_1_12.npy
+/total_windows_1081_12.npy

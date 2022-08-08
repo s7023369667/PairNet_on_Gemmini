@@ -52,15 +52,18 @@ def make_Qsiginals_optimal(windows, header_name=None):
 
 def make_all(dir_path):
     """make all Quantized signals"""
+    Qdir = "./include/Qgesture_signals_testing/"
+    os.mkdir(Qdir)
     for label in os.listdir(dir_path):
         path = os.path.join(dir_path, label)
+        os.mkdir(f'./{Qdir}/{label}')
         for txt in os.listdir(path):
             print(txt)
             windows = make_window_siginals(os.path.join(path, txt))
             if len(windows) == 0:
                 print(f"Gesture length is too short :{txt}")
                 continue
-            header_name = f'./include/Qgesature_signals_test/Quantized_{txt.split("_")[0]}_{label}.h'
+            header_name = f'./{Qdir}/{label}/{txt[:-4]}.h'
             make_Qsiginals_optimal(windows, header_name)
 
 
