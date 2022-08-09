@@ -1,10 +1,12 @@
 // func.h
 // Created by sam on 2021/12/22.
-////Gemmini only accept to import your custom function in <file.h>,
-/// unaccept to import <file.c>.
+////Spike only accept to import your custom function in <file.h>, unaccept to import <file.c>.
 
 #ifndef GEMMINI_PROJECTS_FUNC_H
 #define GEMMINI_PROJECTS_FUNC_H
+#include "include/gemmini.h"
+#include "include/gemmini_params.h"
+#include "include/gemmini_nn.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -12,11 +14,6 @@
 #include <math.h>
 #include <limits.h>
 #include <time.h>
-
-#define elem_t_max 127
-#define elem_t_min -128
-typedef int8_t elem_t;
-typedef int32_t acc_t;
 
 static void block_print(int batch_size, int output_width, int out_channels,
                         elem_t out_feature[batch_size][output_width][out_channels]){
@@ -47,7 +44,6 @@ static double flooring(double x){
     }
     return x;
 }
-
 static double rounding(double x){
     double y,r;
     y = flooring(x);
@@ -184,6 +180,128 @@ static void batch_normalization(int batch_size, int input_width, int in_channels
     }
 }
 
+
+static void group_normalize(int batch_size, int input_width, int in_channels, double input_feature[batch_size][1][input_width][in_channels],
+                            double params[2][in_channels], int G){
+    /**paper : https://arxiv.org/pdf/1803.08494v3.pdf**/
+    /**flatten**/
+    double flattend_feature[1][batch_size*input_width*in_channels];
+    int index = 0;
+    for (int i = 0; i < batch_size; ++i) {
+        for (int k = 0; k < input_width; ++k) {
+            for (int l = 0; l < in_channels; ++l) {
+                flattend_feature[0][index] = input_feature[i][0][k][l];
+                index += 1;
+            }
+        }
+    }
+    /**reshape : (N, G, C//G, H, W)**/
+    index = 0;
+    double reshape_feature[batch_size][G][(int )(in_channels/G)][1][input_width];
+    for (int i = 0; i < batch_size; ++i) {
+        for (int j = 0; j < G; ++j) {
+            for (int k = 0; k < (int )(in_channels/G); ++k) {
+                for (int l = 0; l < input_width; ++l) {
+                    reshape_feature[i][j][k][0][l] = flattend_feature[0][index];
+                    index += 1;
+                }
+            }
+        }
+    }
+
+    double eps = 0.00001;
+
+    for (int batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+
+        for (int group = 0; group < G; ++group) {
+            double sum = 0;
+            double sum_var = 0;
+            /**calculate means*/
+            for (int channel = 0; channel < (int )(in_channels/G); ++channel) {
+                for (int w = 0; w < input_width; ++w) {
+                    sum += reshape_feature[batch_idx][group][channel][0][w];
+                }
+            }
+            double means = sum / (input_width * ((int )(in_channels/G)));
+            /**calculate variance*/
+            for (int channel = 0; channel < (int )(in_channels/G); ++channel) {
+                for (int w = 0; w < input_width; ++w) {
+                    sum_var += pow((reshape_feature[batch_idx][group][channel][0][w] - means), 2);
+                }
+            }
+            double variance = sum_var / (input_width * ((int )(in_channels/G)));
+            /**normalization*/
+            for (int channel = 0; channel < (int )(in_channels/G); ++channel) {
+                for (int w = 0; w < input_width; ++w) {
+                    reshape_feature[batch_idx][group][channel][0][w] = ((reshape_feature[batch_idx][group][channel][0][w] - means) / (sqrt(variance + eps))) ;
+                }
+            }
+        }
+    }
+    /**flatten*/
+    index = 0;
+    for (int i = 0; i < batch_size; ++i) {
+        for (int j = 0; j < G; ++j) {
+            for (int k = 0; k < (int) (in_channels / G); ++k) {
+                for (int l = 0; l < input_width; ++l) {
+                    flattend_feature[0][index] = reshape_feature[i][j][k][0][l];
+                    index += 1;
+                }
+            }
+        }
+    }
+    /**reshape : (N, H, W, C)*/
+    index = 0;
+    for (int i = 0; i < batch_size; ++i) {
+        for (int k = 0; k < input_width; ++k) {
+            for (int l = 0; l < in_channels; ++l) {
+                input_feature[i][0][k][l] = flattend_feature[0][index];
+                index += 1;
+            }
+        }
+    }
+    /**consider gamma & beta*/
+    for (int i = 0; i < batch_size; ++i) {
+        int col = 0;
+        for (int k = 0; k < in_channels; ++k) {
+            for (int l = 0; l < input_width; ++l) {
+                input_feature[i][0][l][k] = input_feature[i][0][l][k] * params[0][col] + params[1][col];
+            }
+            col += 1;
+        }
+    }
+}
+static void average_pooling(int batch_size, int input_width ,int in_channel, const double input_feature[batch_size][1][input_width][in_channel],
+                            int output_width,int out_channel,double output_feature[batch_size][1][output_width][out_channel],
+                            int stride_size, int kernel_size) {
+    /**padding = valid*/
+    for (int batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+        for (int i = 0; i < in_channel; ++i) {
+            bool stop_flag = false;
+            int index = 0;
+            for (int j=0;j< input_width;j+=stride_size){
+                double sum = 0.0;
+                for (int k=0;k<kernel_size;++k){
+                    int curr = j + k;
+                    if (curr < input_width){
+                        sum += input_feature[batch_idx][0][curr][i];
+                    } else{
+                        stop_flag = true;
+                        break;
+                    }
+                }
+                if (stop_flag != true & index < output_width) {
+                    double tmp = (sum / (double) kernel_size);
+                    output_feature[batch_idx][0][index][i] = tmp;
+                    index += 1;
+                }else{
+                    break;
+                }
+            }
+        }
+    }
+}
+
 static void global_avg_pooling(int batch_size, int input_width, int in_channels, double input_feature[batch_size][1][input_width][in_channels],
                                double output_feature[batch_size][in_channels]){
     for (int batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
@@ -272,10 +390,10 @@ static void QDense_gemmini(size_t I, size_t K, size_t J,const elem_t matrixA[I][
         }
     }
     /**Gemmini*/
-//    enum tiled_matmul_type_t tiled_matmul_type = WS;
-//    tiled_matmul_auto(I, J,K, (elem_t*)A, (elem_t*)B,(acc_t*)bias, (elem_t*)matrixC,
-//                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,
-//                      ((S1 * S2) / S3),0,true,false,false,false,false,3,tiled_matmul_type);
+    enum tiled_matmul_type_t tiled_matmul_type = WS;
+    tiled_matmul_auto(I, J,K, (elem_t*)A, (elem_t*)B,(acc_t*)bias, (elem_t*)matrixC,
+                      K, J, J, J, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,
+                      ((S1 * S2) / S3),0,true,false,false,false,false,3,tiled_matmul_type);
 }
 
 static void QDense_cpu(size_t I, size_t K, size_t J, const elem_t matrixA[I][K],const elem_t matrixB[K][J],const acc_t bias[J],
@@ -495,12 +613,12 @@ static void conv1d2matmul_gemmini(size_t batch_size, size_t input_width, size_t 
             start += stride_size * in_channels;
         }
         /**gemmini matmul**/
+        enum tiled_matmul_type_t tiled_matmul_type = WS;
         elem_t gemmini_result[output_width][out_channels];
-//        enum tiled_matmul_type_t tiled_matmul_type = WS;
-//        tiled_matmul_auto(output_width, out_channels,kernel_size*in_channels, (elem_t*)reshape_feature, (elem_t*)reshape_kernel,
-//                          (acc_t*)conv1d_bias, (elem_t*)gemmini_result, kernel_size*in_channels, out_channels, out_channels, out_channels,
-//                          MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,((S1 * S2) / S4),0,true,
-//                          false,false,false,false,3,tiled_matmul_type);
+        tiled_matmul_auto(output_width, out_channels,kernel_size*in_channels, (elem_t*)reshape_feature, (elem_t*)reshape_kernel,
+                          (acc_t*)conv1d_bias, (elem_t*)gemmini_result, kernel_size*in_channels, out_channels, out_channels, out_channels,
+                          MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY, MVIN_SCALE_IDENTITY,NO_ACTIVATION,((S1 * S2) / S4),0,true,
+                          false,false,false,false,3,tiled_matmul_type);
         for (int i = 0; i < output_width; ++i) {
             for (int j = 0; j < out_channels; ++j) {
                 out_feature[batch_idx][i][j] = QRelu_Clip(gemmini_result[i][j], Z4, true);
@@ -513,8 +631,8 @@ static void conv1d2matmul_gemmini(size_t batch_size, size_t input_width, size_t 
 
 void plot_result(int batch_size, double y_axis[batch_size]);
 static void post_processing(int batch_size, int gesN, elem_t result_matrix[batch_size][gesN],int K){
-    /**Top-K Majority Voting Rule
-     * for speedup we use the result from dense layer**/
+    ////NOT USED
+    /**Top-K Majority Voting Rule, for speedup we use the result from dense layer**/
     int max_res1D[batch_size];
     double y_axis[batch_size+2]; //for plot
     for (int i = 0; i < batch_size; ++i) {

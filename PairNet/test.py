@@ -1,38 +1,87 @@
-from keras.models import load_model
-from preprocessing_utils import *
-from os import listdir, path
-from collections import Counter
-import numpy as np
-from texttable import Texttable
-from filtered_result_sequential import sequential_filtered_result
 import os
+from texttable import Texttable
 from termcolor import colored, cprint
-from keras import backend as K
+import numpy as np
 from time import *
+import datetime
+from keras.models import load_model
+from keras import backend as K
 import tensorflow as tf
-import matplotlib.pyplot as plt
-import matplotlib
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import re
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
-import colorama
-
-colorama.init()
+import subprocess as sp
+from tqdm import trange
 
 
-# TODO
-# "IndexError: tuple index out of range"
-# Python3.6中的Lambda函式，在Python3.5會出現的問題
-# https://stackoverflow.com/questions/50551096/convert-keras-model-from-python3-6-to-3-5
-# https://github.com/keras-team/keras/issues/7297
+def sequential_filtered_result(filtered_result, label_len, isDuplicated):
+    def append_index_and_value(pre_number, Now_count):
+        tmp = [pre_number, Now_count]
+        return tmp
+
+    count_result_list = []
+    pre_number = -1
+    try:
+        pre_number = filtered_result[0]
+    except IndexError:
+        print('[filtered_result_sequential] Out of range - ', len(filtered_result))
+    now_count = 0
+
+    for index in np.arange(len(filtered_result)):
+        if pre_number == filtered_result[index]:
+            now_count += 1  # 與前面的數字相同，count + 1
+        else:
+            # 把 [ pre_number(type : str), Now_count(type : int) ] append count_result_list
+            count_result_list.append(append_index_and_value(pre_number, now_count))
+            now_count = 1  # 重新起算，現在就有一個
+
+        pre_number = filtered_result[index]
+    # 最後一個種類要額外寫進去
+    count_result_list.append(append_index_and_value(pre_number, now_count))
+
+    # count_result_list -> [['1', 52], ['5', 2], ['6', 1], ['1', 9], ['9', 2], ['1', 9], ['9', 12]]
+    sort_tmp_list = []
+    for index, value in count_result_list:
+        sort_tmp_list.append(value)  # 把數量的部分單獨拿出來，作為sort指標
+    '''
+        count list - [67  2  1  1  6  3 20]
+        sort index - [0 6 4 5 1 2 3]
+        result_list_index - [0 6 4] ( if label_len = 3 )
+        result_list_index.sort() - [0 4 6]
+    '''
+    sort_tmp_array = np.array(sort_tmp_list)  # list -> np.array()
+    sort_tmp_index = np.argsort(-sort_tmp_array)  # 讓 index 呈降序排列
+    if not isDuplicated:
+        #  原本的做法是直接擷取 label 數量的前幾個index，但會造成出現兩個以上重複手勢
+        #  目前假定手勢 "不會重覆"，所以原本的算法會低估手勢預測的結果
+        count_result_sorted_list = []
+        count_result_sorted_index_list = []  # 紀錄label, 其中不重複
+        for idx in sort_tmp_index:  # 以降冪排列的順序，剃除重複的手勢種類
+            tmp_label_list = [count_result_sorted_list[i][0] for i in range(len(count_result_sorted_list))]
+            if count_result_list[idx][0] not in tmp_label_list:  # [0] 代表手勢種類
+                count_result_sorted_list.append(count_result_list[idx])
+                count_result_sorted_index_list.append(idx)
+
+        count_result_sorted_index_list = count_result_sorted_index_list[0:label_len]
+        count_result_sorted_index_list.sort()
+
+        return_tmp_list_tmp = []
+        for i in count_result_sorted_index_list:
+            return_tmp_list_tmp.append(count_result_list[i][0])
+        return return_tmp_list_tmp
+
+    else:
+        # 根據排序好的 index，回傳對應的手勢
+        result_list_index = sort_tmp_index[0:label_len]
+        result_list_index.sort()  # index
+
+        return_predict_gesture_list = []
+        for i in result_list_index:
+            return_predict_gesture_list.append(count_result_list[i][0])
+        # print(return_predict_gesture_list)0.
+
+        return return_predict_gesture_list
 
 
 def texttable_print_category_hit_rate(Correct_num_arr, label_num_arr, Result_arr):
-    #
     # 為保留手勢0能被當作一種手勢的可能性，所以矩陣大小設為 12
-    #
     table = Texttable()
     table.set_cols_width([10, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6])
     count_str_list = [str(x) for x in range(12)]
@@ -74,156 +123,95 @@ def output_confusion_matrix(test_base, test_index, model_name,
         CMM_out.write('Accuracy,' + str(Model_Accuracy) + '\n')
 
 
-# 用來計算辨識結果，來取最後的正確率
-all_count = 0
-all_correct = 0
-# FIXME 在訓練時最後出來結果是　1 x 12, 所以實際上還是有可能會被辨識出 手勢"0"
-# FIXME 但目前做法會是 (Label - 1)，所以假設有0的會對應到最後一個(也就是手勢11)
-label_num_arr = np.array(np.zeros(12))
-Correct_num_arr = np.array(np.zeros(12))
-Result_arr = np.array(np.zeros(12))
-test_number_for_predict = 0  # 計算每一個測試集有多少資料中(以一行為單位)
+def tf_test(f):
+    global test_number_for_predict
+    sample = []
+    dim = 6
+    split_length = 50
+    with open(f) as test_case:
+        for data_line in test_case:
+            t = data_line.strip().split(' ')
+            sample.append(list(map(float, t)))
+    sample = sample[:-50]  # sample最後50 + 1筆也要扣掉
+    sample_sliding = []  # 有 sliding window 版
 
-Confusion_Matrix = np.array(np.zeros((12, 12)))
+    # 25 + 162 + 24 = 211
+    # 211 - 50 + 1 = 162
+    sample_padding = [[0] * dim] * 25 + sample + [[0] * dim] * 24  # (50, 6)
 
-current_label_count = 0
-current_label_correct = 0
-total_file_count = 0
-total_label_count = 0
+    last_count = 0
+    for i in range(len(sample_padding) - split_length + 1):
+        test_number_for_predict += 1
+
+        sample_tmp = sample_padding[i:i + split_length]  # sliding with window size
+        sample_sliding.append(sample_tmp)
+
+    #  raw_result -> 12 classes 的 softmax值
+    #  (74, 50, 6) -> (74, 50, 12)
+
+    raw_result_sliding = model.predict(np.array(sample_sliding).reshape(len(sample_sliding), split_length, dim))
+    return raw_result_sliding
 
 
-def test(f, model, label, test_base, test_index, model_name, is_Original_RNN):
+def test(f, label, true_label):
     global all_count, all_correct, test_number_for_predict
     global label_num_arr, Correct_num_arr, Result_arr
     global current_label_count, current_label_correct, total_file_count, total_label_count
     global User_false_count
 
-    sample = []
+    """tensorflow test"""
+    # raw_result_sliding = tf_test(f)
+    """using gemmini to test"""
+    raw_result_sliding = gemmini_test(label, file, ai_application='pairnet64')
 
-    """
-      dim -> 決定輸入資料的維度 (六軸 / 陀螺儀 / 加速度計)
-    """
-    dim = 6
-    split_length = 50
-
-    three_axis_part = ''  # 'ACCELEROMETER' / 'GYROSCOPE'
-
-    # Read the sequence
-    with open(f) as test_case:
-        for data_line in test_case:
-            t = data_line.strip().split(' ')
-            if dim == 6:
-                sample.append(list(map(float, t)))
-            elif dim == 3:
-                if three_axis_part == 'ACCELEROMETER':
-                    sample.append(list(map(float, t[0:3])))  # 加速度計
-                elif three_axis_part == 'GYROSCOPE':
-                    sample.append(list(map(float, t[3:6])))  # 陀螺儀
-                else:
-                    print('Did not Assign Three-Axis Data')
-                    os._exit(0)
-
-    sample = sample[:-50]  # sample最後50 + 1筆也要扣掉
-
-    if not is_Original_RNN:
-        """
-          兩個維度
-        """
-        sample_sliding = []  # 有 sliding window 版
-
-        # 25 + 162 + 24 = 211
-        # 211 - 50 + 1 = 162
-        sample_padding = [[0] * dim] * 25 + sample + [[0] * dim] * 24  # (50, 6)
-
-        last_count = 0
-        for i in range(len(sample_padding) - split_length + 1):
-            test_number_for_predict += 1
-
-            sample_tmp = sample_padding[i:i + split_length]  # sliding with window size
-            sample_sliding.append(sample_tmp)
-
-        #  raw_result -> 12 classes 的 softmax值
-        #  (74, 50, 6) -> (74, 50, 12)
-        raw_result_sliding = model.predict(np.array(sample_sliding).reshape(len(sample_sliding), split_length, dim))
-
-        label_str1 = '-'.join(str(x) for x in label)
-        file_name = (f.split('\\')[-1])[:-4]
-        model_short = model_name_short.split('_')[-1]
-        model_output = '({}) {} {}'.format(label_str1, model_short, file_name)
-
-        filtered_result_sliding_version = []
-        for i in raw_result_sliding:
-            label_tmp = i.argmax()  # (12,) -> inttf.compat.v1.
-            filtered_result_sliding_version.append(label_tmp)
-        guess = sequential_filtered_result(filtered_result_sliding_version, len(label),
-                                           isDuplicated=False)  # 防止出現長度無法對齊
-
-    else:
-        """
-          三個維度
-        """
-        sample_non_sliding = sample  # 傳統LSTM一次只會進1*6
-
-        raw_result_non_sliding = model.predict(np.array(sample_non_sliding).reshape(1, len(sample_non_sliding), dim))
-        raw_result_non_sliding = np.squeeze(raw_result_non_sliding)  # (1, 74, 12) -> (74, 12)
-
-        # TODO 由於Origin LSTM 沒有做 sliding window，只能針對整體做正規化(?
-        filtered_result_non_sliding_version = []
-        for j in raw_result_non_sliding:  # raw_result -> (162, 12)  : txt中所有資料
-            filtered_result_non_sliding_version.append(j.argmax())  # filtered_result  ->  (162, )  : txt中每一筆預測的手勢
-
-        guess = sequential_filtered_result(filtered_result_non_sliding_version, len(label),
-                                           isDuplicated=False)  # TODO 給Original RNN用
-
-    # guess = list(map(lambda x: x[0], Counter(filtered_result).most_common(len(label))))  # 最一開始的方法
-
+    filtered_result_sliding_version = []
+    for i in raw_result_sliding:
+        label_tmp = i.argmax()  # (12,) -> inttf.compat.v1.
+        filtered_result_sliding_version.append(label_tmp)
+    guess = sequential_filtered_result(filtered_result_sliding_version, len(true_label),
+                                       isDuplicated=False)  # 防止出現長度無法對齊
+    cprint(text=f'True Label: {true_label}', color='blue')
+    cprint(text=f'Predict   : {guess}', color='blue')
     """
       描述少了哪些手勢
     """
-    if len(guess) != len(label):
-        print('{}File Name : {}'.format(' ' * 4, f))
+    if len(guess) != len(true_label):
+        cprint('{}File Name : {}'.format(' ' * 4, f), color='red')
         # print('{}{}'.format(' ' * 4, filtered_result_sliding_version))
-        print('{}True Label: {} ; Predict: {} -> '.format(' ' * 6, label, guess), end='')
-        guess = guess + [guess[-1]] * (len(label) - len(guess))  # 會出差超過兩個的情況
+        cprint('{}True Label: {} ; Predict: {} -> '.format(' ' * 6, true_label, guess), end='', color='red')
+        guess = guess + [guess[-1]] * (len(true_label) - len(guess))  # 會出差超過兩個的情況
         cprint(colored(guess, 'white', 'on_grey'), end='\n\n')
 
-    # 輸出最多的 len(label) 個元素  -> len(label) 代表有幾個手勢
-    # Counter(filtered_result) -> Counter({2: 72, 1: 65, 7: 17, 3: 6, 4: 1, 5: 1})
-    # guess -> [2, 1]
-    # lambda -> 來定義函式
-    #        -> x : [(2, 72), (1, 65)]
-    #        -> x[0] : [2, 1]
-
-    # print(type(guess))
-    # print(guess)
-
-    all_count += len(label)
-    current_label_count += len(label)
-    for i in label:
+    """   
+        輸出最多的 len(label) 個元素  -> len(label) 代表有幾個手勢
+        Counter(filtered_result) -> Counter({2: 72, 1: 65, 7: 17, 3: 6, 4: 1, 5: 1})
+        guess  -> [2, 1]
+        lambda -> 來定義函式
+               -> x : [(2, 72), (1, 65)]
+               -> x[0] : [2, 1]
+    """
+    all_count += len(true_label)
+    current_label_count += len(true_label)
+    for i in true_label:
         label_num_arr[i] += 1  # 計算每種手勢出現次數(標籤)
-
-    #
-    # 以 set 的觀點， {1, 2, 1} == {1, 1, 2}
-    # 但若有順序情況下會不同
-    #
-
     """
-      計算Hit rate時仍就沒有順序之分
+        以 set 的觀點， {1, 2, 1} == {1, 1, 2}
+        但若有順序情況下會不同
+        計算Hit rate時仍就沒有順序之分
     """
-    comapre_Result = set(guess).intersection(label)
+    comapre_Result = set(guess).intersection(true_label)
 
     '''
-      這裡並未把辨識結果的「順序」拿來討論，只要有被辨識出來就算
-      因此，先把 實際 與 辨識結果 都有的部分(交集)拿出來
-      剩下來的就是沒能辨識正確的 -> 額外放進 Confusion Matrix
+        這裡並未把辨識結果的「順序」拿來討論，只要有被辨識出來就算
+        因此，先把 實際 與 辨識結果 都有的部分(交集)拿出來
+        剩下來的就是沒能辨識正確的 -> 額外放進 Confusion Matrix
     '''
-    tmp_label = label.copy()
+    tmp_label = true_label.copy()
     tmp_guess = guess.copy()
     for i in list(comapre_Result):
         Confusion_Matrix[i][i] += 1  # 辨識結果與實際上相同
         tmp_label.remove(i)
         tmp_guess.remove(i)
-
     """
       計算 Confusion Matrix中兩手勢不同的狀況
     """
@@ -231,9 +219,8 @@ def test(f, model, label, test_base, test_index, model_name, is_Original_RNN):
     for _ in tmp_label:
         Confusion_Matrix[tmp_label[tmp_index]][tmp_guess[tmp_index]] += 1
         tmp_index += 1
-
     """
-      計算辨識正確的手勢個數
+        計算辨識正確的手勢個數
     """
     all_correct += len(comapre_Result)
     current_label_correct += len(comapre_Result)
@@ -241,153 +228,181 @@ def test(f, model, label, test_base, test_index, model_name, is_Original_RNN):
         Correct_num_arr[correct] += 1  # 計算有被辨識出來的手勢
 
 
+def gemmini_test(sub_dir, txtfile, ai_application, main_operation=None):
+    test_dir = "Qgesture_signals_testing"
+    hfile = txtfile[:-4] + '.h'
+    make_top_hfile(test_dir, sub_dir, hfile, ai_application)
+    op = 'pairNet_ALLQ_main'
+    if main_operation == 'conv1d':
+        op = 'mc2_conv1d_main'
+    program_path = '/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/bareMetalC/'
+    build_path = '/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/'
+    run_path = '/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/build/bareMetalC/'
+    riscv_file = op + '-pk'
+    save_txt = f'{op}.txt'
+    command = f'spike --extension=gemmini pk {riscv_file} > {save_txt}'
+    os.chdir(program_path)
+    if not os.path.exists(program_path + op + '.c'):
+        print("Cannot find the main file...")
+    os.chdir(build_path)
+    if os.path.exists(os.path.join(build_path, 'build')):
+        build = sp.Popen("source /home/sam/chipyard/env.sh  && sudo rm -r build && ./build.sh",
+                         shell=True, executable="/bin/bash", stdout=sp.PIPE).stdout.read()
+    else:
+        build = sp.Popen("source /home/sam/chipyard/env.sh  &&  ./build.sh",
+                         shell=True, executable="/bin/bash", stdout=sp.PIPE).stdout.read()
+    # for line in build.decode().split('\n'):
+    #     print(line)
+    os.chdir(run_path)
+    sp.Popen(f"source /home/sam/chipyard/env.sh && {command}", shell=True, executable="/bin/bash",
+             stdout=sp.PIPE).stdout.read()
+    path = f'/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/build/bareMetalC/{save_txt}'
+    out_result = []
+    with open(path, 'r') as f:
+        lines = f.readlines()
+    s, e = 0, len(lines)
+    for i in range(len(lines)):
+        if "Dense out" in lines[i]:
+            s = i + 1
+        elif "SUCCESS" in lines[i]:
+            e = i - 1
+    lines = lines[s:e]
+    for line in lines:
+        out_result.append(list(map(int, line.split())))
+    return np.array(out_result)
+
+
+def make_top_hfile(test_dir, sub_dir, hfile, ai_application):
+    if ai_application == 'pairnet16':
+        app = 'Qpairnet_params12_16_optimal.h'
+    elif ai_application == 'pairnet32':
+        app = 'Qpairnet_params12_32_optimal.h'
+    elif ai_application == 'pairnet64':
+        app = 'Qpairnet_params12_64_optimal.h'
+    else:
+        print('Flag : ai_application should be "pairnet16" or "pairnet32" or "pairnet64"')
+        raise KeyError
+    gemmini_dir = '/home/sam/chipyard/generators/gemmini/software/gemmini-rocc-tests/include/'
+    hfile_path = f'"include/{test_dir}/{sub_dir}/{hfile}"'
+    top_hfile_path = os.path.join(gemmini_dir, 'top_hfile.h')
+    with open(os.path.join(top_hfile_path), 'w') as file:
+        file.write(f"//{datetime.datetime.now()}\n")
+        file.write(f"#ifndef GEMMINI_PROJECTS_TOP_HFILE_H\n")
+        file.write(f"#define GEMMINI_PROJECTS_TOP_HFILE_H\n")
+        file.write(f'#include "include/{app}"\n')
+        file.write(f"#include {hfile_path}\n")
+        # file.write(f"#define GES_NUM {GES_NUM}\n")
+        file.write(f"#endif //GEMMINI_PROJECTS_TOP_HFILE_H\n")
+
+
 if __name__ == '__main__':
+    # 用來計算辨識結果，來取最後的正確率
+    all_count = 0
+    all_correct = 0
+    # 在訓練時最後出來結果是　1 x 12, 所以實際上還是有可能會被辨識出 手勢"0"
+    # 但目前做法會是 (Label - 1)，所以假設有0的會對應到最後一個(也就是手勢11)
+    label_num_arr = np.array(np.zeros(12))
+    Correct_num_arr = np.array(np.zeros(12))
+    Result_arr = np.array(np.zeros(12))
+    test_number_for_predict = 0  # 計算每一個測試集有多少資料中(以一行為單位)
+
+    Confusion_Matrix = np.array(np.zeros((12, 12)))
+
+    current_label_count = 0
+    current_label_correct = 0
+    total_file_count = 0
+    total_label_count = 0
 
     Total_start = time()
 
-    Model_name_Reader = open('Model_name.txt', 'r')
-
-    model_base = []
-    for line in open('Model_name.txt'):
-        model_tmp = Model_name_Reader.readline()
-        model_base.append(model_tmp[:-1])  # 處理字串後面的 '\n'
-
-    test_base = ['1071109_test_1-2-3-4_New12(J&W&D&j)']
-    test_model_nums = len(model_base)  # 讀進已經訓練好的模型的名稱
-
-    """
-        先看過一輪，設定csv的第一行 ( 代表的手勢組合 )，紀錄每個組合各自的正確率00
-    """
     # Test Every Testing Set
-    test_path = '1071109_test_1-2-3-4_New12/'
-    Now_Time = strftime("%Y%m%d_%H%M_%S", localtime())
-    Now_Time = '(' + Now_Time + ')'
+    test_path = '/home/sam/CLionProjects/gemmini_projects/PairNet/1071109_test_1-2-3-4_New12_test'
+    test_base = [test_path]
+    Now_Time = '(' + strftime("%Y%m%d_%H%M_%S", localtime()) + ')'
     for test_index in range(0, len(test_base)):
         test_base_dir = test_base[test_index]
         path_list = sorted(os.listdir(test_base_dir), key=lambda i: len(i), reverse=False)
 
-        with open(str(Now_Time) + test_base[test_index] + '.csv', 'a') as current_label_writer:
+        with open(test_base[test_index] + f'{str(Now_Time)}.csv', 'a') as current_label_writer:
             current_label_writer.write(' ,')
             for label in path_list:
                 label = label.replace('-', '_')
                 current_label_writer.write(label + ',')
             current_label_writer.write('Accuracy \n')
 
-    # 開始預測手勢
-    for model_index in range(0, test_model_nums):
+    model_name = './model/pairnet_model64_12_20220503.h5'
+    model = load_model(model_name)  # keras.models.load_model()
+    for test_index in range(0, len(test_base)):
+        start = time()
+        test_base_dir = test_base[test_index]
 
-        model_name = model_base[model_index]
-
-        # 限制GPU的用量
-        gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.6, allow_growth=True)
-
-        is_Only_using_CPU = False  # TODO 是否禁用GPU (為加速LSTM)
-        if is_Only_using_CPU:
-            sess = tf.compat.v1.Session(
-                config=tf.compat.v1.ConfigProto(gpu_options=gpu_options, device_count={'GPU': 0}))
-            tf.compat.v1.keras.backend.get_session(sess)
-        else:
-            sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=gpu_options))
-            tf.compat.v1.keras.backend.get_session(sess)
-
-        """
-          要先set_session() 才能 load_model() -> 不然會有變數無法初始化的問題
-        """
-        model = load_model(model_name)  # keras.models.load_model()
-
-        cprint(colored('[ {i} / {n} ] : {N}  (model)'.format(i=model_index, n=test_model_nums - 1, N=model_name)),
-               'cyan', 'on_grey')
-
-        is_Original_RNN = False
-
-        for test_index in range(0, len(test_base)):
-
-            start = time()
-
-            print(' ' * 4, end='')
-            cprint(colored('[ {i} / {n} ] : {N}  (testing set)'.format(i=test_index, n=len(test_base) - 1,
-                                                                       N=test_base[test_index])), 'red', 'on_grey',
-                   end='\n\n')
-
-            # print('    ', test_base[test_index], end='')
-            test_base_dir = test_base[test_index]
-
-            model_name_split_tmp = model_name.split('_')
-            model_name_short = '_'.join(model_name_split_tmp[0:5])
-
-            with open(str(Now_Time) + test_base[test_index] + '.csv', 'a') as current_label_writer:
-                current_label_writer.write(model_name_short + ',')
-
-            test_set_file_number = 0  # 計算每一個測試集有多少資料(.txt)
-            path_list = sorted(os.listdir(test_base_dir), key=lambda i: len(i), reverse=False)  # 按照順序
-            for label in path_list:  # label : '1-2', '1-3', ...
-                subdir = path.join(test_base_dir, label)  # 'test\test3\1-2', 'test\test3\1-3', ...
-
-                for file in listdir(subdir):  # 'SensorData_2017_11_21_161824.txt', ....
-                    if '.txt' not in file:  # 副檔名不是txt -> 不進行處理(非預期裝手勢的檔案)
-                        continue
-                    file_path = path.join(test_base_dir, label)  # 'test\test3\1-2'
-                    file_path = path.join(file_path, file)  # 'test\test3\1-2\SensorData_2017_11_21_161824.txt'
-                    # print('Testing on ' + str(file_path))
-                    true_label = list(map(int, label.split('-')))  # '[1 , 2]'
-                    test_set_file_number += 1
-                    test(file_path, model, true_label, test_base, test_index, model_name, is_Original_RNN)
-
-                #
-                # for 結束代表同一個手勢組合結束，判斷單一組合辨識率
-                #
-
-                current_gesture_set_predict = round(current_label_correct / current_label_count, 2)
-                with open(str(Now_Time) + test_base[test_index] + '.csv', 'a') as current_label_writer:
-                    current_label_writer.write(str(current_gesture_set_predict) + ',')
-
-                # 換一個Label 就初始化
-                current_label_count = 0
-                current_label_correct = 0
-
-            Model_Accuracy = (1. * all_correct) / all_count
-            Model_Accuracy = round(Model_Accuracy, 4)
-
-            end = time()
-
-            cprint(colored('(Accuracy) : {M}  ==>  Number_of_test : {f}[{d}]'.format(M=Model_Accuracy,
-                                                                                     f=test_set_file_number,
-                                                                                     d=all_count)), 'yellow')
-
-            with open(str(Now_Time) + test_base[test_index] + '.csv', 'a') as current_label_writer:
-                current_label_writer.write(str(Model_Accuracy) + '\n')
-
-            for arr_index in range(0, 12):  # 求各種手勢正確率
-                if label_num_arr[arr_index] == 0:
-                    Result_arr[arr_index] = 0
-                else:
-                    Result_arr[arr_index] = round(Correct_num_arr[arr_index] / label_num_arr[arr_index], 3)
-
-            # 用 textable 的方式來印出各種類手勢的辨識狀態 ( *** 正確率以set來計算，沒有考慮到順序 *** )
-            table = texttable_print_category_hit_rate(Correct_num_arr, label_num_arr, Result_arr)
-            print(table.draw())
+        test_set_file_number = 0  # 計算每一個測試集有多少資料(.txt)
+        path_list = sorted(os.listdir(test_base_dir), key=lambda i: len(i), reverse=False)  # 按照順序
+        for i in trange(len(path_list)):  # label : '1-2', '1-3', ...
+            sub_dir = os.path.join(test_base_dir, path_list[i])  # 'test\test3\1-2', 'test\test3\1-3', ...
             print()
-            print('Testing time - {}s'.format(round(float(end - start), 4)), end='\n\n')
+            print(sub_dir)
+            for file in os.listdir(sub_dir):  # 'SensorData_2017_11_21_161824.txt', ....
+                if '.txt' not in file:  # 副檔名不是txt -> 不進行處理(非預期裝手勢的檔案)
+                    continue
+                file_path = os.path.join(test_base_dir, path_list[i])  # 'test\test3\1-2'
+                file_path = os.path.join(file_path, file)  # 'test\test3\1-2\SensorData_2017_11_21_161824.txt'
+                # print('Testing on ' + str(file_path))
+                true_label = list(map(int, path_list[i].split('-')))  # '[1 , 2]'
+                test_set_file_number += 1
+                test(file_path, path_list[i], true_label)
+            # for 結束代表同一個手勢組合結束，判斷單一組合辨識率
 
-            # FIXME 將 Confusion Matrix 輸出到 .csv 中，檔名是 ( .h5名稱 + 測試集名稱 )
-            # output_confusion_matrix(test_base, test_index, model_name,
-            #                         Confusion_Matrix, label_num_arr, Result_arr,
-            #                         Model_Accuracy)
+            current_gesture_set_predict = round(current_label_correct / current_label_count, 2)
+            with open(test_base[test_index] + f'{str(Now_Time)}.csv', 'a') as current_label_writer:
+                current_label_writer.write(str(current_gesture_set_predict) + ',')
 
-            # 初始化全域變數
-            label_num_arr = np.zeros(12)
-            Correct_num_arr = np.zeros(12)
-            Result_arr = np.zeros(12)
-            Confusion_Matrix = np.zeros((12, 12))
+            # 換一個Label 就初始化
+            current_label_count = 0
+            current_label_correct = 0
 
-            all_correct = 0
-            all_count = 0
-            test_number_for_predict = 0
-            total_file_count = 0
-            total_label_count = 0
+        Model_Accuracy = (1. * all_correct) / all_count
+        Model_Accuracy = round(Model_Accuracy, 4)
 
+        end = time()
+        cprint(colored('(Accuracy) : {M}  ==>  Number_of_test : {f}[{d}]'.format(M=Model_Accuracy,
+                                                                                 f=test_set_file_number,
+                                                                                 d=all_count)), 'yellow')
+
+        with open(test_base[test_index] + f'{str(Now_Time)}.csv', 'a') as current_label_writer:
+            current_label_writer.write(str(Model_Accuracy) + '\n')
+
+        for arr_index in range(0, 12):  # 求各種手勢正確率
+            if label_num_arr[arr_index] == 0:
+                Result_arr[arr_index] = 0
+            else:
+                Result_arr[arr_index] = round(Correct_num_arr[arr_index] / label_num_arr[arr_index], 3)
+
+        # 用 textable 的方式來印出各種類手勢的辨識狀態 ( *** 正確率以set來計算，沒有考慮到順序 *** )
+        table = texttable_print_category_hit_rate(Correct_num_arr, label_num_arr, Result_arr)
+        print(table.draw())
         print()
-        K.clear_session()
+        print('Testing time - {}s'.format(round(float(end - start), 4)), end='\n\n')
+
+        # 將 Confusion Matrix 輸出到 .csv 中，檔名是 ( .h5名稱 + 測試集名稱 )
+        # output_confusion_matrix(test_base, test_index, model_name,
+        #                         Confusion_Matrix, label_num_arr, Result_arr,
+        #                         Model_Accuracy)
+
+        # 初始化全域變數
+        label_num_arr = np.zeros(12)
+        Correct_num_arr = np.zeros(12)
+        Result_arr = np.zeros(12)
+        Confusion_Matrix = np.zeros((12, 12))
+
+        all_correct = 0
+        all_count = 0
+        test_number_for_predict = 0
+        total_file_count = 0
+        total_label_count = 0
+
+    print()
+    K.clear_session()
 
     Total_end = time()
     print('Total testing time - ', end='')

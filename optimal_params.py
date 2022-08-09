@@ -3,7 +3,7 @@ import os
 from tensorflow.keras.models import load_model
 from tqdm._tqdm import trange
 from library import *
-from Qconv1d import reshape_kernel
+from library import reshape_kernel
 
 
 def get_rawData(dir_path, cnt, gesN):
@@ -25,9 +25,7 @@ def get_rawData(dir_path, cnt, gesN):
         if flag:
             break
     total_windows = np.array(total_windows)
-    print("total:", total_windows.shape)
-    np.save(f'total_windows_{c}_12', total_windows)
-    return f'total_windows_{c}_12.npy'
+    return total_windows
 
 
 def get_sAndz(fp_feature):
@@ -239,7 +237,7 @@ def make_header(gesN, window_size, model_path, S1, Z1, S4, Z4, header_name=None)
                 QDense_bias = Quantization(dense_biasCorr, sb, zb)
                 s1, z1 = np.mean(S1[layer_cnt]), int(np.mean(Z1[layer_cnt]))
                 s4, z4 = np.mean(S4[layer_cnt]), int(np.mean(Z4[layer_cnt]))
-                QDense_bias = ((sb / (s1*s2)) * (QDense_bias - zb)) + (z4 / ((s1 * s2) / s4))
+                QDense_bias = ((sb / (s1 * s2)) * (QDense_bias - zb)) + (z4 / ((s1 * s2) / s4))
                 QDense_bias = np.round(QDense_bias)
                 QDense_bias = np.array(QDense_bias, dtype=np.int32)
                 file.write(f"static const acc_t QDense_bias[{QDense_bias.shape[0]}] = \n")
@@ -263,19 +261,13 @@ def make_header(gesN, window_size, model_path, S1, Z1, S4, Z4, header_name=None)
 def main():
     train_dir = './OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)/'
     gesN = 12
-    channel = 16
-    # path = './OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)/2/D20180910-004950_(Johny)_H50_N1_K2.txt'
-    # test_case = make_window_siginals(path)
-    # test_case = np.array([test_case])
-    # data_windows = test_case
-    data_windows = np.load(get_rawData(train_dir, 2000, gesN))
+    channel = 64
+    data_windows = get_rawData(train_dir, 2000, gesN)
+    model_path = 'PairNet/model/pairnet_model64_12_20220503.h5'
 
-    S1, Z1, S4, Z4 = get_layer_factor(window_size=50,
-                                      model_path='PairNet/model/pairnet_model16_12_20220503.h5',
-                                      total_features=data_windows)
+    S1, Z1, S4, Z4 = get_layer_factor(window_size=50, model_path=model_path, total_features=data_windows)
     make_header(gesN=gesN, window_size=50, S1=S1, Z1=Z1, S4=S4, Z4=Z4,
-                model_path='PairNet/model/pairnet_model16_12_20220503.h5',
-                header_name=f'./include/Qpairnet_params{gesN}_{channel}_optimal_test.h')
+                model_path=model_path, header_name=f'./include/Qpairnet_params{gesN}_{channel}_optimal.h')
 
 
 if __name__ == '__main__':
