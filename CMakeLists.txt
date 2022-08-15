@@ -5,6 +5,7 @@ set(CMAKE_C_STANDARD 99)
 add_executable(PairNet_ALLQ
         include/func.h
         src/pairNet_ALLQ_main.c
+        src/pairNet_mc2_main.c
         include/gemmini_custom.h
         ../../chipyard/generators/gemmini/software/gemmini-rocc-tests/include/top_hfile.h)
 

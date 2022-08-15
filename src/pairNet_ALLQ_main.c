@@ -1,4 +1,4 @@
-// PairNet_ALLQ_main.c
+// pairNet_ALLQ_main.c
 // Created by sam on 2022/1/20.
 //
 
