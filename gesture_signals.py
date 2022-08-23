@@ -52,7 +52,7 @@ def make_Qsiginals_optimal(windows, header_name=None):
 
 def make_all(dir_path):
     """make all Quantized signals"""
-    Qdir = "./include/Qgesture_signals_testing/"
+    Qdir = "./include/Qgesture_signals_training/"
     os.mkdir(Qdir)
     for label in os.listdir(dir_path):
         path = os.path.join(dir_path, label)
@@ -68,9 +68,9 @@ def make_all(dir_path):
 
 
 if __name__ == '__main__':
-    # dir_path = './OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)/'
-    dir_test_path = './OapNet/test/1100920_test_(J&W&D&j&in0)/'
-    make_all(dir_test_path)
+    dir_path = './OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)/'
+    # dir_test_path = './OapNet/test/1100920_test_(J&W&D&j&in0)/'
+    make_all(dir_path)
     # path = './OapNet/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110100_(Wen)_H50_N3_K9-8-4.txt'
     # windows = make_window_siginals(dir_test_path)
     # print(windows.shape)

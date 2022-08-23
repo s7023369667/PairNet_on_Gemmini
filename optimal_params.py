@@ -261,9 +261,9 @@ def make_header(gesN, window_size, model_path, S1, Z1, S4, Z4, header_name=None)
 def main():
     train_dir = './OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)/'
     gesN = 12
-    channel = 64
+    channel = 32
     data_windows = get_rawData(train_dir, 2000, gesN)
-    model_path = 'PairNet/model/pairnet_model64_12_20220503.h5'
+    model_path = 'PairNet/model/pairnet_model128_12_20220823.h5'
 
     S1, Z1, S4, Z4 = get_layer_factor(window_size=50, model_path=model_path, total_features=data_windows)
     make_header(gesN=gesN, window_size=50, S1=S1, Z1=Z1, S4=S4, Z4=Z4,

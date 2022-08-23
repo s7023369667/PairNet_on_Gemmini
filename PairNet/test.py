@@ -9,6 +9,8 @@ from keras import backend as K
 import tensorflow as tf
 import subprocess as sp
 from tqdm import trange
+from sklearn.metrics import confusion_matrix, classification_report
+import pandas as pd
 
 
 def sequential_filtered_result(filtered_result, label_len, isDuplicated):
@@ -123,6 +125,27 @@ def output_confusion_matrix(test_base, test_index, model_name,
         CMM_out.write('Accuracy,' + str(Model_Accuracy) + '\n')
 
 
+def cal_precision_recall(cm:np.ndarray):
+    tp, fp, fn, tn = 0, 0, 0, 0
+    for i in range(len(cm)):
+        for j in range(len(cm[0])):
+            if i > 4 and j > 4 and i == j:
+                tp += cm[i][j]
+            elif i <= 4 and j > 4 and i != j:
+                if cm[i][j] != 0:
+                    fp += cm[i][j]
+            elif i > 4 and j <= 4 and i != j:
+                if cm[i][j] != 0:
+                    fn += cm[i][j]
+            elif i <= 4 and j <= 4 and i == j:
+                tn += cm[i][j]
+    accuracy = (tp + tn) / (tp + fp + tn + fn)
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+
+    return accuracy, precision, recall
+
+
 def tf_test(f):
     global test_number_for_predict
     sample = []
@@ -153,7 +176,7 @@ def tf_test(f):
     return raw_result_sliding
 
 
-def test(f, label, true_label):
+def test(f, label, true_label, dis_gesN):
     global all_count, all_correct, test_number_for_predict
     global label_num_arr, Correct_num_arr, Result_arr
     global current_label_count, current_label_correct, total_file_count, total_label_count
@@ -162,7 +185,7 @@ def test(f, label, true_label):
     """tensorflow test"""
     # raw_result_sliding = tf_test(f)
     """using gemmini to test"""
-    raw_result_sliding = gemmini_test(label, file, ai_application='pairnet64')
+    raw_result_sliding = gemmini_test(label, file, ai_application='pairnet128')
 
     filtered_result_sliding_version = []
     for i in raw_result_sliding:
@@ -170,8 +193,7 @@ def test(f, label, true_label):
         filtered_result_sliding_version.append(label_tmp)
     guess = sequential_filtered_result(filtered_result_sliding_version, len(true_label),
                                        isDuplicated=False)  # 防止出現長度無法對齊
-    cprint(text=f'True Label: {true_label}', color='blue')
-    cprint(text=f'Predict   : {guess}', color='blue')
+
     """
       描述少了哪些手勢
     """
@@ -181,6 +203,9 @@ def test(f, label, true_label):
         cprint('{}True Label: {} ; Predict: {} -> '.format(' ' * 6, true_label, guess), end='', color='red')
         guess = guess + [guess[-1]] * (len(true_label) - len(guess))  # 會出差超過兩個的情況
         cprint(colored(guess, 'white', 'on_grey'), end='\n\n')
+
+    cprint(text=f'True Label: {true_label}', color='blue')
+    cprint(text=f'Predict   : {guess}', color='blue')
 
     """   
         輸出最多的 len(label) 個元素  -> len(label) 代表有幾個手勢
@@ -212,6 +237,7 @@ def test(f, label, true_label):
         Confusion_Matrix[i][i] += 1  # 辨識結果與實際上相同
         tmp_label.remove(i)
         tmp_guess.remove(i)
+
     """
       計算 Confusion Matrix中兩手勢不同的狀況
     """
@@ -225,10 +251,12 @@ def test(f, label, true_label):
     all_correct += len(comapre_Result)
     current_label_correct += len(comapre_Result)
     for correct in comapre_Result:
-        Correct_num_arr[correct] += 1  # 計算有被辨識出來的手勢
+        if correct > dis_gesN:
+            Correct_num_arr[correct] += 1  # 計算有被辨識出來的手勢
 
 
 def gemmini_test(sub_dir, txtfile, ai_application, main_operation=None):
+    train_dir = "Qgesture_signals_training"
     test_dir = "Qgesture_signals_testing"
     hfile = txtfile[:-4] + '.h'
     make_top_hfile(test_dir, sub_dir, hfile, ai_application)
@@ -279,6 +307,8 @@ def make_top_hfile(test_dir, sub_dir, hfile, ai_application):
         app = 'Qpairnet_params12_32_optimal.h'
     elif ai_application == 'pairnet64':
         app = 'Qpairnet_params12_64_optimal.h'
+    elif ai_application == 'pairnet128':
+        app = 'Qpairnet_params12_128_optimal.h'
     else:
         print('Flag : ai_application should be "pairnet16" or "pairnet32" or "pairnet64"')
         raise KeyError
@@ -296,6 +326,8 @@ def make_top_hfile(test_dir, sub_dir, hfile, ai_application):
 
 
 if __name__ == '__main__':
+    # filter background gestures
+    dis_geN = 4
     # 用來計算辨識結果，來取最後的正確率
     all_count = 0
     all_correct = 0
@@ -305,6 +337,9 @@ if __name__ == '__main__':
     Correct_num_arr = np.array(np.zeros(12))
     Result_arr = np.array(np.zeros(12))
     test_number_for_predict = 0  # 計算每一個測試集有多少資料中(以一行為單位)
+
+    confusion_true_label = []
+    confusion_predict_label = []
 
     Confusion_Matrix = np.array(np.zeros((12, 12)))
 
@@ -317,6 +352,7 @@ if __name__ == '__main__':
 
     # Test Every Testing Set
     test_path = '/home/sam/CLionProjects/gemmini_projects/PairNet/1071109_test_1-2-3-4_New12_test'
+    # train_path = '/home/sam/CLionProjects/gemmini_projects/OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)'
     test_base = [test_path]
     Now_Time = '(' + strftime("%Y%m%d_%H%M_%S", localtime()) + ')'
     for test_index in range(0, len(test_base)):
@@ -330,7 +366,7 @@ if __name__ == '__main__':
                 current_label_writer.write(label + ',')
             current_label_writer.write('Accuracy \n')
 
-    model_name = './model/pairnet_model64_12_20220503.h5'
+    model_name = './model/pairnet_model128_12_20220823.h5'
     model = load_model(model_name)  # keras.models.load_model()
     for test_index in range(0, len(test_base)):
         start = time()
@@ -350,7 +386,7 @@ if __name__ == '__main__':
                 # print('Testing on ' + str(file_path))
                 true_label = list(map(int, path_list[i].split('-')))  # '[1 , 2]'
                 test_set_file_number += 1
-                test(file_path, path_list[i], true_label)
+                test(file_path, path_list[i], true_label, dis_geN)
             # for 結束代表同一個手勢組合結束，判斷單一組合辨識率
 
             current_gesture_set_predict = round(current_label_correct / current_label_count, 2)
@@ -360,6 +396,17 @@ if __name__ == '__main__':
             # 換一個Label 就初始化
             current_label_count = 0
             current_label_correct = 0
+
+        all_count = 0
+        all_correct = 0
+        for arr_index in range(0, 12):  # 求各種手勢正確率
+            if label_num_arr[arr_index] == 0:
+                Result_arr[arr_index] = 0
+            else:
+                Result_arr[arr_index] = round(Correct_num_arr[arr_index] / label_num_arr[arr_index], 3)
+                if arr_index > dis_geN:
+                    all_correct += Correct_num_arr[arr_index]
+                    all_count += label_num_arr[arr_index]
 
         Model_Accuracy = (1. * all_correct) / all_count
         Model_Accuracy = round(Model_Accuracy, 4)
@@ -371,12 +418,6 @@ if __name__ == '__main__':
 
         with open(test_base[test_index] + f'{str(Now_Time)}.csv', 'a') as current_label_writer:
             current_label_writer.write(str(Model_Accuracy) + '\n')
-
-        for arr_index in range(0, 12):  # 求各種手勢正確率
-            if label_num_arr[arr_index] == 0:
-                Result_arr[arr_index] = 0
-            else:
-                Result_arr[arr_index] = round(Correct_num_arr[arr_index] / label_num_arr[arr_index], 3)
 
         # 用 textable 的方式來印出各種類手勢的辨識狀態 ( *** 正確率以set來計算，沒有考慮到順序 *** )
         table = texttable_print_category_hit_rate(Correct_num_arr, label_num_arr, Result_arr)
@@ -393,7 +434,7 @@ if __name__ == '__main__':
         label_num_arr = np.zeros(12)
         Correct_num_arr = np.zeros(12)
         Result_arr = np.zeros(12)
-        Confusion_Matrix = np.zeros((12, 12))
+        # Confusion_Matrix = np.zeros((12, 12))
 
         all_correct = 0
         all_count = 0
@@ -407,8 +448,30 @@ if __name__ == '__main__':
     Total_end = time()
     print('Total testing time - ', end='')
 
+    # y_actu = pd.Series(confusion_true_label, name='Actual')
+    # y_pred = pd.Series(confusion_predict_label, name='Predicted')
+    # df_confusion = pd.crosstab(y_actu, y_pred, dropna=False)
+    # print(df_confusion)
+
     Total_time = Total_end - Total_start
     Total_minute, Total_second = divmod(Total_time, 60)
     Total_hour, Total_minute = divmod(Total_minute, 60)
     cprint(colored('{}h {}m {}s'.format(round(Total_hour), round(Total_minute), round(Total_second), width=2),
                    'red', 'on_grey'))
+
+    # delete_index = []
+    # for i in range(len(confusion_true_label)):
+    #     if confusion_true_label[i] <= dis_geN or confusion_predict_label[i] <= dis_geN:
+    #         delete_index.append(i)
+    #
+    # idx = 0
+    # for index in delete_index:
+    #     confusion_true_label.pop(index-idx)
+    #     confusion_predict_label.pop(index-idx)
+    #     idx += 1
+
+    print(Confusion_Matrix)
+    accuracy, precision, recall = cal_precision_recall(Confusion_Matrix)
+    print("acc:", accuracy)
+    print("precision", precision)
+    print("recall", recall)
