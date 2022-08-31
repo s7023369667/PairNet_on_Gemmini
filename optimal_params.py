@@ -142,10 +142,10 @@ def make_header(gesN, window_size, model_path, S1, Z1, S4, Z4, header_name=None)
                 output_width = (input_width - kernel_size + padding_size) // stride + 1
                 s2, z2 = get_sAndz(convBN)
                 sb, zb = get_sAndz(convBN_biasCorr)
+                s1, z1 = np.mean(S1[layer_cnt]), int(np.mean(Z1[layer_cnt]))
+                s4, z4 = np.mean(S4[layer_cnt]), int(np.mean(Z4[layer_cnt]))
                 """write QConv_BN"""
                 QConv_BN = Quantization(convBN, s2, z2)
-                # QConv_BN = np.array(QConv_BN, dtype=np.int32)
-                # QConv_BN = np.clip(QConv_BN - z2, a_min=-128, a_max=127)
                 file.write(
                     f"static const elem_t QConv_BN{layer.name[-1]}[{filters}][{in_channels}][{out_channels}]=\n")
                 file.write('{')
@@ -169,7 +169,10 @@ def make_header(gesN, window_size, model_path, S1, Z1, S4, Z4, header_name=None)
                             file.write('}')
                 file.write('};\n')
                 """write QConv_BN_mc2"""
-                QConv_BN_mc2 = reshape_kernel(QConv_BN)
+                QConv_BN_mc2 = np.array(QConv_BN, dtype=np.int32)
+                # # pre-processing weight quantization
+                QConv_BN_mc2 = np.clip(QConv_BN_mc2 - z2, a_min=-128, a_max=127)
+                QConv_BN_mc2 = reshape_kernel(QConv_BN_mc2)
                 file.write(
                     f"static const elem_t QConv_BN_mc2_{layer.name[-1]}[{kernel_size * in_channels}][{out_channels}]=\n")
                 file.write('{')
@@ -185,8 +188,6 @@ def make_header(gesN, window_size, model_path, S1, Z1, S4, Z4, header_name=None)
                     else:
                         file.write('}')
                 file.write('};\n')
-                s1, z1 = np.mean(S1[layer_cnt]), int(np.mean(Z1[layer_cnt]))
-                s4, z4 = np.mean(S4[layer_cnt]), int(np.mean(Z4[layer_cnt]))
                 """write bias """
                 QConv_BN_bias = Quantization(convBN_biasCorr, sb, zb)
                 QConv_BN_bias = ((sb / (s1 * s2)) * (QConv_BN_bias - zb)) + (z4 / ((s1 * s2) / s4))
@@ -217,8 +218,6 @@ def make_header(gesN, window_size, model_path, S1, Z1, S4, Z4, header_name=None)
                 dense_biasCorr = bias_Correction(dense_bias)
                 """write QDense_params"""
                 QDense = Quantization(dense, s2, z2)
-                # QDense = np.array(QDense, dtype=np.int32)
-                # QDense = np.clip(QDense - z2, a_min=-128, a_max=127)
                 file.write(f"static const elem_t QDense_params[{QDense.shape[0]}][{QDense.shape[1]}] = \n")
                 file.write('{')
                 for i in range(QDense.shape[0]):
@@ -263,11 +262,11 @@ def main():
     gesN = 12
     channel = 32
     data_windows = get_rawData(train_dir, 2000, gesN)
-    model_path = 'PairNet/model/pairnet_model128_12_20220823.h5'
+    model_path = 'PairNet/model/pairnet_model32_12_20220822.h5'
 
     S1, Z1, S4, Z4 = get_layer_factor(window_size=50, model_path=model_path, total_features=data_windows)
     make_header(gesN=gesN, window_size=50, S1=S1, Z1=Z1, S4=S4, Z4=Z4,
-                model_path=model_path, header_name=f'./include/Qpairnet_params{gesN}_{channel}_optimal.h')
+                model_path=model_path, header_name=f'./include/Qpairnet_params{gesN}_{channel}_optimal_test_mc2.h')
 
 
 if __name__ == '__main__':

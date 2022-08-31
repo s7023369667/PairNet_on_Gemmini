@@ -95,14 +95,14 @@ int main(){
                    Dense1_params.s3, (elem_t)Dense1_params.z3);
     end = read_cycles();
     printf("Cost(clock cycles) Dense = %lu\n", end - start);
-    printf("Dense out\n");
-    for (int i = 0; i < BATCH_SIZE; ++i) {
-        for (int j = 0; j < Dense1_params.J; ++j) {
-            printf("%d ", QDense_out[i][j]);
-        }
-        printf("\n");
-    }
-//    post_processing(BATCH_SIZE, gesN, QDense_out, GES_NUM);
+//    printf("Dense out\n");
+//    for (int i = 0; i < BATCH_SIZE; ++i) {
+//        for (int j = 0; j < Dense1_params.J; ++j) {
+//            printf("%d ", QDense_out[i][j]);
+//        }
+//        printf("\n");
+//    }
+//    post_processing(BATCH_SIZE, gesN, QDense_out, 4);
 //////    printf("Cost(clock cycles) = %lu\n", end - start);
 //////    double t_cost = (double )(end - start) / 31250000.0;
 //////    printf("Cost(Second) = %f\n", t_cost);

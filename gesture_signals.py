@@ -12,7 +12,7 @@ def make_Qsiginals_optimal(windows, header_name=None):
     """Quantize gesture signals"""
     # # give general s1, z1
     s1, z1 = 0.9189412337744948, -1
-    Q_windows = Quantization(windows, s1, z1)
+    Q_windows = Quantization(windows, s1, z1) - z1
     # Q_windows = np.array(Q_windows, dtype=np.int32)
     # Q_windows = np.clip(Q_windows - z1, a_min=-128, a_max=127)
     f = open(header_name, "w+")
@@ -68,11 +68,11 @@ def make_all(dir_path):
 
 
 if __name__ == '__main__':
-    dir_path = './OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)/'
-    # dir_test_path = './OapNet/test/1100920_test_(J&W&D&j&in0)/'
-    make_all(dir_path)
-    # path = './OapNet/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110100_(Wen)_H50_N3_K9-8-4.txt'
-    # windows = make_window_siginals(dir_test_path)
-    # print(windows.shape)
-    # make_Qsiginals_optimal(windows, './include/Qgesture_signals_984_test.h')
-    # make_Qsiginals_optimal(windows, './include/Qgesture_signals_optimal_1.h')
+    # # male all test
+    dir_train_path = './OapNet/train/train_raw/1071101_Johny[5]&Wen[5]_train_New12(J&W)/'
+    # dir_train_path = './OapNet/test/1100920_test_(J&W&D&j&in0)/'
+    # make_all(dir_path)
+    # # make one test
+    path = './OapNet/test/1100920_test_(J&W&D&j&in0)/9-8-4/TD20180927-110100_(Wen)_H50_N3_K9-8-4.txt'
+    windows = make_window_siginals(path)
+    make_Qsiginals_optimal(windows, './include/Qgesture_signals_984_test.h')
