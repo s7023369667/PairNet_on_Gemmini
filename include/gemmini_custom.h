@@ -17,6 +17,28 @@
 //#include "rocc-software/src/xcustom.h"
 #define PE 8
 
+/***********************************************/
+/**add this "mc2_config" into gemmini.h**/
+//#define gemmini_mc2_config_ex(dataflow, sys_act) \
+//  { \
+//    ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, ((uint64_t)acc_scale_t_to_acc_scale_t_bits((acc_scale_t)1.0) << 32) | ((uint64_t)(1) << 16) | ((sys_act) << 3) | ((dataflow) << 2) | CONFIG_EX, ((uint64_t)(1) << 48) , k_CONFIG); \
+//  }
+//
+//#define gemmini_mc2_config_st(stride, acc_act, acc_scale) \
+//ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, ((acc_act) << 2) | CONFIG_ST, ((uint64_t)acc_scale_t_to_acc_scale_t_bits((acc_scale_t)acc_scale) << 32) | ((uint32_t)stride), k_CONFIG)
+//
+//#define gemmini_mc2_config_ldA(stride, scale) \
+//  ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, ((uint64_t)(scale_t_to_scale_t_bits(scale)) << 32) | ((uint64_t)(DIM) << 16) | ((uint64_t)(1) << 8) | CONFIG_LD, stride, k_CONFIG)
+//
+//
+//#define gemmini_mc2_config_ldB(stride, scale) \
+//ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, ((uint64_t)(scale_t_to_scale_t_bits(scale)) << 32) | ((uint64_t)(DIM) << 16) | ((uint64_t)(1) << 8) |((1) << 3)| CONFIG_LD, stride, k_CONFIG)
+//
+//
+//#define gemmini_mc2_config_ldD(stride, scale) \
+//  ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, ((uint64_t)(scale_t_to_scale_t_bits(scale)) << 32) | ((uint64_t)(DIM) << 16) | ((uint64_t)(1) << 8) |((2) << 3)| CONFIG_LD, stride, k_CONFIG)
+/***********************************************/
+
 /**gemmini global average pooling*/
 static void global_avg(int out_dim, int out_channels, int PE_N, const elem_t * A, const elem_t * C){
     double scale = 1.0 / out_dim;
